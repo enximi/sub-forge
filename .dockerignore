@@ -9,9 +9,8 @@
 !crates/sub-forge/src/
 !crates/sub-forge/src/**
 !frontend/
-!frontend/Dockerfile
-!frontend/nginx.conf
 !frontend/index.html
 !frontend/styles.css
 !frontend/app.js
-!frontend/generator-worker.js
+!frontend/api.js
+!frontend/rules-picker.js

@@ -6,7 +6,7 @@ use std::{
 use reqwest::Url;
 
 use crate::{
-    error::AppError, network::PublicNetwork, policy::ConverterOptions,
+    error::AppError, model::ConverterOptions, network::PublicNetwork,
     upstream::read_limited_response,
 };
 
@@ -89,16 +89,12 @@ impl Converter {
         url
     }
 
-    pub async fn generate(
-        &self,
-        request: &ConversionRequest,
-        options: &ConverterOptions,
-    ) -> Result<Vec<u8>, AppError> {
+    pub async fn generate(&self, request: &ConversionRequest) -> Result<Vec<u8>, AppError> {
         let url = self.request_url(
             &request.converter_url,
             &request.subscription_url,
             &request.rules_url,
-            options,
+            &request.options,
         );
         let response = self.network.get(url).await?;
         read_limited_response(response, self.max_bytes).await

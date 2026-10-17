@@ -33,6 +33,11 @@ impl PublicNetwork {
             ));
         }
         url.set_fragment(None);
+        if url.as_str().len() > 2048 {
+            return Err(AppError::BadRequest(
+                "链接规范化后过长，最多支持 2048 字节".into(),
+            ));
+        }
         Ok(url)
     }
 

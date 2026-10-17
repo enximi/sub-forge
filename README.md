@@ -1,70 +1,90 @@
 # sub-forge
 
-无状态的 Mihomo 订阅转换 HTTP 服务。用户在独立网页填写订阅来源、规则模板、转换器地址、转换参数与可选 JavaScript，浏览器本地生成可直接导入客户端的订阅地址。客户端访问地址时，核心读取链接内的配置并执行转换。核心没有网页、数据库、用户配置文件或定时任务，不缓存订阅内容。
+Mihomo 订阅转换 HTTP 服务。用户在内置网页填写订阅来源、规则模板、转换器地址、转换参数与可选 JavaScript，由后端校验并保存到 SQLite，返回固定长度随机 ID 的订阅链接。客户端访问时，核心从数据库读取配置并执行转换；不缓存上游订阅内容。
 
 ## Workspace
 
 ```text
 crates/
-└── sub-forge/                 Rust 核心 HTTP API
-    └── src/                   网络校验、编码链接、脚本执行与转换编排
+└── sub-forge/                 Rust 单体程序：网页与 HTTP API
+    └── src/                   网络校验、SQLite 存储、脚本执行与转换编排
 frontend/                      原生 HTML / CSS / JavaScript 单页
 ├── index.html                 表单与结果区域
 ├── styles.css                 桌面与移动端样式
-├── app.js                     表单交互、复制与下载
-└── generator-worker.js        脚本压缩与 v1 链接编码（固定版本 CDN 依赖）
+├── app.js                     页面状态、表单交互、复制与下载
+├── api.js                     HTTP 请求、错误与超时处理
+└── rules-picker.js            规则选择器与键盘交互
 ```
 
-Cargo workspace 只包含 Rust 核心 crate；前端是无需构建的静态文件，可独立部署。生成链接无需访问后端，下载配置和客户端刷新时才调用核心。`cargo run` 只启动 API；主 Compose 使用两个发布镜像分别运行 API 和网页，也可单独启动其中一个。核心使用方式见 [sub-forge 核心](crates/sub-forge/README.md)，前端使用方式见 [静态前端](frontend/README.md)。
+Cargo workspace 包含一个 Rust 可执行程序。前端 HTML、CSS、JavaScript 在编译时嵌入二进制，启动后同一端口提供网页、API 和健康检查。只需部署一个程序或一个容器，不需要 Nginx、Node.js 或独立静态目录。程序说明见 [sub-forge](crates/sub-forge/README.md)，页面源码说明见 [前端](frontend/README.md)。
+
+## 架构
+
+```text
+内置网页 / HTTP 路由 / 鉴权 / 响应
+          ↓
+SubscriptionService：创建、转换、订阅与规则取源
+          ├── Links → Store → SQLite
+          ├── SubscriptionSource / RuleSource → PublicNetwork
+          └── ConfigPipeline → Converter / ScriptEngine
+```
+
+- `model.rs` 定义完整订阅、转换参数、用户脚本及四种链接记录；必需字段由类型保证。
+- `http/` 只处理路由、请求提取、鉴权、限流及响应映射，不直接操作数据库或执行脚本。
+- `service.rs` 负责业务流程、并发和整体转换超时；`links.rs` 统一管理链接用途和地址。
+- `store.rs` 负责 SQLite 读写及去重，`store/migrations.rs` 负责事务迁移和数据库版本检查。
+- 取源、规则保护、转换器调用和脚本执行分别封装，原有公网网络边界保持一致。
+- 前端使用原生 ES Modules：页面状态、API 请求、规则选择器独立，不引入框架或构建工具。
 
 ## 调用方式
 
-打开前端，填写 SubForge 后端基础地址、订阅来源、规则模板和转换器地址，按需调整选项与脚本，再点击“生成订阅地址”。浏览器使用 Terser 去除脚本注释和多余空白，将配置转换为紧凑 JSON，使用 fflate 进行 zlib 压缩，再编码成带 `v1.` 前缀的 URL 安全 Base64 令牌。
+打开服务首页，填写订阅来源、规则模板和转换器地址，按需调整选项与脚本，再点击“生成订阅地址”。前端通过 `POST /api/v1/subscriptions` 提交参数，核心验证 URL 格式、转换选项、脚本大小和 QuickJS 语法，保存配置后返回订阅 URL。
 
-生成过程不请求后端、不检查 DNS 或抓取订阅。将结果复制到 Clash / Mihomo 客户端即可使用；实际转换发生在访问生成的地址时。转换器必须是可公网访问的 SubConverter 兼容接口，不提供默认转换器或规则源。
+生成阶段不抓取上游，也不执行用户脚本；实际公网访问检查和转换发生在访问订阅时。生成成功不代表上游可用或脚本运行成功。转换器必须是公网可访问的 SubConverter 兼容接口。
 
 ```text
-浏览器 → 本地校验、压缩与编码 → /api/v1/clash/<编码令牌>
-客户端 → GET /api/v1/clash/<令牌> → 核心 → SubConverter
-                                  ├─→ /api/v1/subscription/<专用令牌> → 用户订阅 → 订阅 JS
-                                  └─→ /api/v1/rules/<专用令牌> → 规则模板 → 预处理 JS
+浏览器 → POST /api/v1/subscriptions → SQLite → /api/v1/clash/<随机 ID>
+客户端 → GET /api/v1/clash/<ID> → 核心 → SubConverter
+                                  ├─→ /api/v1/subscription/<专用 ID> → 用户订阅 → 订阅 JS
+                                  └─→ /api/v1/rules/<专用 ID> → 规则模板 → 预处理 JS
                         ← 最终 YAML ← 后处理 JS ← 基础 YAML
-客户端刷新 provider → /api/v1/subscription/<专用令牌> → 用户订阅 → 订阅 JS
+客户端刷新 provider → /api/v1/subscription/<专用 ID> → 用户订阅 → 订阅 JS
 ```
 
-转换器通过独立令牌从公开 API 地址获取订阅和模板，必须能访问该地址。客户端刷新 provider 也使用公开 API 地址。所有回调由核心处理，静态前端不参与客户端订阅刷新。
+转换器通过独立 ID从公开 API 地址获取订阅和模板，必须能访问该地址。客户端刷新 provider 也使用公开 API 地址。所有回调由核心处理，静态前端不参与客户端订阅刷新。
 
 服务检查模板确认标记，防止转换器取模板失败后静默退回默认配置；该临时标记不会进入最终 YAML。原始订阅、规则模板和参数始终由调用方提供。
 
 ## API
 
-业务接口统一使用 `/api/v1` 前缀，`/health` 独立于业务版本。部署基础地址不包含 `/api/v1`，由前端和核心在生成请求、订阅及回调地址时添加。令牌内的 `v1.` 仅表示编码格式，与 API 版本独立。
+业务接口统一使用 `/api/v1` 前缀，`/health` 独立于业务版本。部署基础地址不包含 `/api/v1`，由前端和核心在生成请求、订阅及回调地址时添加。所有链接 ID 都是 32 个十六进制字符，不携带用户参数。
 
 | 接口 | 用途 |
 | --- | --- |
-| `GET /api/v1/clash/{token}` | 按该链接内的编排设置和代码生成最终 YAML |
-| `GET /api/v1/subscription/{token}` | 获取原始内容，执行该用户的订阅处理脚本 |
-| `GET /api/v1/rules/{token}` | 获取模板，执行该用户的规则预处理脚本 |
-| `GET /api/v1/rule-resource/{token}` | 受限转发模板引用的远程规则列表 |
+| `POST /api/v1/subscriptions` | 保存参数并返回 `{id, url}`，HTTP 201 |
+| `GET /api/v1/clash/{id}` | 读取 SQLite 中的编排设置和代码生成最终 YAML |
+| `GET /api/v1/subscription/{id}` | 获取原始内容，执行该用户的订阅处理脚本 |
+| `GET /api/v1/rules/{id}` | 获取模板，执行该用户的规则预处理脚本 |
+| `GET /api/v1/rule-resource/{id}` | 受限转发模板引用的远程规则列表 |
 | `GET /health` | 204，仅检查进程存活 |
 
-核心不提供创建订阅地址的 POST 接口。浏览器编码协议及短字段映射见[核心 README](crates/sub-forge/README.md#订阅链接格式)。
+生成接口的 JSON 字段和调用示例见[核心 README](crates/sub-forge/README.md#生成订阅链接)。
 
-各接口校验令牌用途，格式无效或用途不匹配时返回 401；链接内容可自行解码修改，读取时仍校验输入。输入错误返回 400，超过频率返回 429，达到并发上限返回 503，上游或执行问题返回 502。脚本错误只反馈阶段和截断后的异常信息，不记录脚本内容或敏感 URL。
+各接口从 SQLite 查找记录并校验用途；未知 ID、旧编码令牌或用途不匹配返回 401。输入错误返回 400，超过频率返回 429，达到并发上限返回 503，上游或执行问题返回 502。脚本错误只反馈阶段和截断后的异常信息，不记录脚本内容或敏感 URL。
 
 ## 公开或私有部署
 
-`SUB_FORGE_ACCESS_TOKEN` 默认留空，任何人都可以使用 API。私有部署时，在服务端设置随机 token，并在前端“访问 token（可选）”中填写同一值。token 须为 32 至 256 个可打印 ASCII 字符，不含空白；可用 `openssl rand -hex 32` 生成。不要将真实 token 写入提交到仓库的配置或静态前端。
+`SUB_FORGE_ACCESS_TOKEN` 用于控制生成权限。设置后，只有 `POST /api/v1/subscriptions` 需要 `Authorization: Bearer <生成 token>`；缺失、错误或重复 Authorization 请求头返回 401，不接受 URL 查询参数传递凭据。前端在“生成 token”中填写同一值。配置留空时允许公开生成。
 
-启用后，所有 `/api/*` 请求需要携带 `?access_token=...` 或 `Authorization: Bearer ...`，缺失或错误返回 401。重复查询参数、重复 Authorization 请求头或相互冲突的凭据会被拒绝。`/health` 与 CORS 预检无需 token；静态页面仍可公开访问，但不能绕过后端鉴权。
+token 须为 32 至 256 个可打印 ASCII 字符，不含空白，可用 `openssl rand -hex 32` 生成。不要将真实 token 提交到仓库或写入静态前端。Docker 在服务器私有 Compose 的 `environment` 中设置，直接运行在环境变量或 `.env` 中设置。
 
-前端自动把访问 token 放进订阅链接，核心自动为订阅源、规则模板、规则资源与 provider 回调补上 token。该 token 独立于 `v1.` 配置令牌，不改变编码协议。外部转换器、客户端及脚本的相关回调 URL 会包含它，因此只使用可信转换器，不要公开分享链接或生成的配置。
+订阅下载、订阅源、规则模板、规则资源和 provider 回调均无需生成 token；生成的 URL 只包含随机 ID。网页、健康检查和 CORS 预检也无需 token。所有业务请求仍受 IP 限流约束。
 
-访问 token 是整个服务的共享凭据，不提供用户账户或单条订阅权限。更换 token 并重启服务可使所有旧凭据失效，随后应重新生成订阅并更新客户端配置中的回调地址；多副本须设置相同 token。Docker 在服务器私有 Compose 的 `environment` 中设置，直接运行在环境变量或 `.env` 中设置。
+短链接本身是访问凭据，持有链接即可读取对应内容，请妥善保管。生成 token 不会写入链接、数据库记录或脚本上下文。更换 token 并重启只影响后续生成，已有链接继续有效；此机制不提供用户账户、过期时间或单条订阅撤销。
 
 ## 编排与用户脚本
 
-用户在表单中填写编排参数和三个阶段的同步 JavaScript，前端按 v1 协议编码进链接；核心解码为类型化的 `Policy` 和 `UserScripts`。下表使用核心内部字段名，链接中的短字段见协议说明。核心固定阶段顺序与网络边界。
+用户在表单中填写编排参数和三个阶段的同步 JavaScript，后端以类型化的 `Policy` 和 `UserScripts` 保存。下表为生成接口 `policy` 内的字段。核心固定阶段顺序与网络边界。
 
 | 编排字段 | 类型与用途 | 默认值 |
 | --- | --- | --- |
@@ -100,69 +120,46 @@ function transform(config) {
 
 前置规则和代理组由用户的规则预处理脚本提供，DNS、TUN 和 Tailscale 等配置由后处理脚本提供。Tailscale 登录密钥可由用户写进自己的后处理脚本，也会出现在最终 YAML；订阅和规则回调只携带各自阶段的代码，不携带后处理脚本。
 
-前端提供三个空白脚本编辑器，用户直接填写代码。核心只执行编码链接携带的代码。
+前端提供三个空白脚本编辑器，后端原样保存代码，包括注释与排版。三个脚本合计最多 64 KiB，请求 JSON 最多 512 KiB；链接长度不随脚本增长。无需脚本压缩、紧凑字段、zlib 或 Base64 编码。
 
-服务端没有用户数据库、脚本文件、订阅记录或浏览器本地存储。原始链接、转换器选择、编排设置和全部用户脚本转换为链接专用的紧凑 JSON，经 zlib 压缩和 URL 安全 Base64 编码后封装在订阅地址中，编码本身不需要密钥；私有模式另外校验访问 token。链接内容可解码读取和修改，不提供加密或签名，请勿公开分享。更新设置或脚本后重新生成地址；使用同一 API 地址且访问 token 配置一致的副本可以处理已有链接，重启不会丢失用户配置，统一限流放到网关。
-
-链接内部使用短字段名和扁平结构，省略默认转换参数与空脚本；解码时按 `v1` 固定默认值恢复。生成链接前，浏览器使用 Terser 去除脚本注释与多余空白，保留标识符、属性名和运算逻辑，不执行用户代码。语法解析不保证 QuickJS 兼容性、入口存在或执行成功；这些检查由核心在实际使用时完成。链接只携带压缩后的代码，不保留原始排版，报错位置以压缩后的代码为准。
-
-脚本合计最多 64 KiB，编码前 JSON 最大 128 KiB；压缩编码后的令牌最多 8192 字符，解压输出最多 128 KiB。重复较少的长脚本仍可能超过地址长度限制。当前使用带 `v1.` 前缀的编码令牌，只接受当前格式。
+参数相同的请求复用已有记录和链接。修改参数或脚本会生成新链接，已有配置保持不变。订阅源、规则模板与远程规则列表的回调也使用数据库中的独立随机 ID，重复刷新复用记录。
 
 ### 执行环境
 
-QuickJS 只提供 JavaScript 标准能力，没有文件系统、环境变量、网络、Node.js、npm、模块导入或定时器，不接受 Promise 或 `async transform`。每次执行限制时间、内存、栈和并发。浏览器生成地址时校验参数和脚本语法；核心在实际取源和转换时检查脚本入口、同步返回值与执行结果。依赖实际节点、模板或 YAML 字段的错误在使用链接时反馈。
+QuickJS 只提供 JavaScript 标准能力，没有文件系统、环境变量、网络、Node.js、npm、模块导入或定时器，不接受 Promise 或 `async transform`。每次执行限制时间、内存、栈和并发。核心生成地址时校验参数和脚本语法，在实际取源和转换时检查脚本入口、同步返回值与执行结果。依赖实际节点、模板或 YAML 字段的错误在使用链接时反馈。
 
-`context.version` 为 1；`context.stage` 为对应的阶段名称；`context.urls` 提供当前阶段相关的回调地址；`context.secrets` 始终为空对象。不同脚本之间不共享上下文修改。私有模式的回调地址包含访问 token，请使用可信脚本及转换器。
+`context.version` 为 1；`context.stage` 为对应的阶段名称；`context.urls` 提供当前阶段相关的回调地址；`context.secrets` 始终为空对象。不同脚本之间不共享上下文修改。回调地址不包含生成 token，但可读取对应内容，请使用可信脚本及转换器。
 
 YAML 经对象解析后重新序列化，注释、锚点写法和排版不会保留。程序检查最终顶层对象及大小，不替代 Mihomo 内核验证所有配置字段。转换器的管理员插入节点功能固定关闭。
 
-## 使用发布镜像部署
+## 单容器部署
 
-需要 Docker Compose 和能访问订阅、规则源及转换器的服务器。GitHub Release 发布后，Actions 构建并推送以下 AMD64 / ARM64 镜像：
-
-| 镜像 | 用途 |
-| --- | --- |
-| `ghcr.io/enximi/sub-forge:v1.0.0` | Rust 核心 API，容器内端口 8080 |
-| `ghcr.io/enximi/sub-forge-web:v1.0.0` | 静态网页，容器内端口 8080 |
-
-服务器只需要 `compose.yml` 和私有部署参数，无需 Git、Rust、Node.js 或仓库源码。下载本次发布的 Compose 模板：
+程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 AMD64 / ARM64。当前版本为 `0.1.0`。需要从源码构建时使用：
 
 ```bash
-mkdir -p sub-forge && cd sub-forge
-curl -fL https://raw.githubusercontent.com/enximi/sub-forge/v1.0.0/compose.yml -o compose.yml
-chmod 600 compose.yml
+docker compose -f compose.yml -f compose.dev.yml up -d --build --wait
 ```
 
-在 Compose 的 `environment` 中设置实际 `SUB_FORGE_PUBLIC_BASE_URL`。私有部署填写随机 `SUB_FORGE_ACCESS_TOKEN`，浏览器跨域下载时设置 `SUB_FORGE_ALLOWED_ORIGINS`。这些值只保存在自己的服务器上，不提交到公开仓库。然后拉取并启动：
+先在 `compose.yml` 设置实际 `SUB_FORGE_PUBLIC_BASE_URL`；私有部署填写 `SUB_FORGE_ACCESS_TOKEN`。启动后打开 `http://127.0.0.1:8002/`，网页和 `/api/v1/*` 都由该端口提供。SQLite 数据保存在 `sub-forge-data` 命名卷中。
+
+使用发布镜像部署或升级：
 
 ```bash
 docker compose pull
 docker compose up -d --no-build --wait
 ```
 
-API 绑定宿主机 `127.0.0.1:8002`，网页绑定 `127.0.0.1:8081`。已有 HTTPS 代理可将 `/api/*`、`/health` 转发到 API，其他路径转发到网页；同域部署仍需在页面填写公开后端地址。若只需要 API，使用 `docker compose up -d --no-build --wait sub-forge`。也可将前端四个静态文件独立托管。
+HTTPS、域名和证书由外部反向代理负责，将整个站点转发到 `127.0.0.1:8002` 即可，无需按网页和 API 分流。首页返回 200，`/health` 返回 204，未知路径返回 404。仅将真实代理网络填入 `TRUSTED_PROXY_CIDRS`，避免代理记录完整订阅路径、查询参数或请求体。
 
-HTTPS、域名和证书由外部反向代理负责。API 的 `GET /health` 返回 204，网页首页返回 200。核心的 `/` 返回 404。仅将真实代理网络填入 `TRUSTED_PROXY_CIDRS`，避免代理记录完整订阅路径、查询参数或请求体。
+从原先的两个容器部署升级时，还需停止和移除旧的独立网页容器；保留 SQLite 数据卷。生产升级使用明确版本或摘要。调用方自行选择可公网访问的 SubConverter 兼容服务；Sub-Store 是可选上游，配置见 `compose.sub-store.yml`，不属于程序运行依赖。
 
-升级时将 Compose 中两个镜像标签改成新的发布版本，再执行 `pull` 和 `up -d --no-build --wait`。回滚改回上一版本标签，或使用已记录的镜像摘要。生产部署建议使用明确版本或摘要；`latest` 仅用于跟随最近发布。
+## 页面与 API 地址
 
-调用方自行选择可公网访问的 SubConverter 兼容服务，转换器必须能访问本站回调地址。Sub-Store 是可选上游，配置见 `compose.sub-store.yml`，不属于核心的运行依赖。其持久化数据独立于核心，用户提交的订阅地址必须公网可达。
+页面自动使用同源 API，不需要填写后端地址或配置 CORS。生成结果使用服务端 `SUB_FORGE_PUBLIC_BASE_URL`，以便外部转换器和客户端访问；页面“下载配置”通过当前站点的 API 读取同一记录，无需携带生成 token。
 
-服务器上更新部署文件时保留原所有者和权限；普通管理账号持有部署配置，含 token 的文件使用 600。不要用 root 创建临时文件替换后遗失原文件所有者。
+部署在路径前缀下时，例如 `https://example.com/sub-forge/`，反向代理须把 `/sub-forge` 重定向到 `/sub-forge/`，并去除该前缀后转发给程序。`SUB_FORGE_PUBLIC_BASE_URL` 设置为 `https://example.com/sub-forge`。页面资源与 API 请求使用相对路径。
 
-## 独立前端与跨域调用
-
-前端直接部署 `frontend/` 下的 HTML、CSS 和 JS 静态文件，不需要 npm 安装或构建。页面中的“后端地址”可随时修改；部署者也可修改 `index.html` 中 `sub-forge-api-base-url` 元标签来设置默认值。基础地址可包含部署路径前缀，不包含 `/api/v1`、查询参数或片段。
-
-本地预览：
-
-```bash
-python3 -m http.server 8081 --bind 127.0.0.1 --directory frontend
-```
-
-打开 `http://127.0.0.1:8081/`。生成和复制链接不需要后端在线，也不需要 CORS。使用“下载配置”时，页面会跨域 GET 生成的地址，需要将核心的 `SUB_FORGE_ALLOWED_ORIGINS` 设置为前端来源，例如 `http://127.0.0.1:8081` 或 `https://ui.example.com`；多个来源用逗号分隔，留空禁用跨域访问。不接受 `*`、凭据、路径或查询参数，不使用会话 Cookie。HTTPS 页面下载时也需使用 HTTPS 后端。
-
-客户端刷新订阅直接访问核心，前端关闭或重新部署不会影响已有链接。公网转换仍要求核心配置正确的 `SUB_FORGE_PUBLIC_BASE_URL`，供转换器获取回调内容。
+`SUB_FORGE_ALLOWED_ORIGINS` 仅用于额外的第三方浏览器调用方；内置页面不需要设置。只接受明确来源，不使用会话 Cookie。网页与 API 共用一个程序版本，修改 `frontend/` 文件后需要重新编译。
 
 ## 本机运行
 
@@ -172,19 +169,23 @@ python3 -m http.server 8081 --bind 127.0.0.1 --directory frontend
 cp -n .env.example .env
 ```
 
-在 `.env` 中填写实际 API 地址和程序监听地址，然后运行：
+在 `.env` 中填写实际公开地址和程序监听地址，然后运行：
 
 ```bash
 cargo run --locked -p sub-forge
 ```
 
-订阅链接必须包含可公网访问的转换器地址。本机运行也会校验用户输入 URL 的公网访问边界；执行完整转换时，将 `SUB_FORGE_PUBLIC_BASE_URL` 设置为转换器和客户端均可访问的公开 API 地址。
+默认打开 `http://127.0.0.1:8080/` 即可使用网页。订阅链接必须包含可公网访问的转换器地址。本机运行也会校验用户输入 URL 的公网访问边界；执行完整转换时，将 `SUB_FORGE_PUBLIC_BASE_URL` 设置为转换器和客户端均可访问的公开 API 地址。
 
-## 无状态范围
+## SQLite 持久化与迁移
 
-用户订阅、参数和脚本只在当前请求内使用，服务不保存用户记录。编码链接携带重建配置所需内容；使用同一 API 地址且访问 token 配置一致的另一副本可以直接处理原链接。链接没有自动过期时间，也没有单条撤销功能，请像原始订阅一样妥善保管。
+`SUB_FORGE_DATABASE_PATH` 默认是 `data/sub-forge.sqlite3`，父目录自动创建。Compose 使用命名卷 `sub-forge-data` 挂载 `/app/data`，API 以非 root 用户运行，镜像预先设置目录权限。SQLite 使用 WAL，启动时按 `user_version` 事务迁移，保留已有记录的 ID 和创建时间；重启和容器重建保留数据，删除数据卷会使全部已有链接失效。
 
-进程保留临时并发许可和 IP 限流计数，用于限制公开服务的资源占用；它们不是用户配置或持久化状态。多副本统一限流放到网关。静态前端同样不保存用户输入，不使用浏览器本地存储。
+数据库保存原始订阅地址、参数与脚本，请保护目录权限。在线备份使用 SQLite 的 `.backup`，或停止服务后备份整个数据目录；运行时不要只复制主数据库而漏掉 WAL 文件。多个独立数据库的副本不能处理彼此生成的链接，当前以单实例和本地持久卷部署为主。
+
+旧的 `v1.` 编码链接不再支持，需要在新前端重新填写参数生成。数据库记录不自动过期，暂不提供账户、修改、删除或单条撤销接口。输入仍仅保存在浏览器页面内存，刷新页面不会恢复表单，但已生成的链接可继续使用。
+
+`v0.1.0` 起使用 SQLite 和单体部署；Compose 默认使用该版本镜像。
 
 ## 公网运行边界
 
@@ -207,7 +208,7 @@ cargo run --locked -p sub-forge
 | `SCRIPT_MAX_BYTES` | 1 MiB |
 | `SCRIPT_CONCURRENCY` | 4 |
 
-链接内 JSON 上限 128 KiB，每个输入 URL 上限 2048 字节。响应逐块读取并检查大小。HTTP 响应禁用缓存、跨站引用和内容类型嗅探。服务不记录完整请求 URI、请求体或用户订阅。健康接口不会执行转换，不能代表整条链路正常。
+生成接口的 JSON 上限 512 KiB，每个输入 URL 上限 2048 字节。响应逐块读取并检查大小。HTTP 响应禁用缓存、跨站引用和内容类型嗅探。服务不记录完整请求 URI、请求体或用户订阅。健康接口不会执行转换，不能代表整条链路正常。
 
 ## 开发与发布
 
@@ -218,16 +219,18 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo build --locked -p sub-forge
 ```
 
-本地需要构建容器时使用 `docker compose -f compose.yml -f compose.dev.yml up -d --build`。API 和网页分别打包，API 以非 root 用户运行，镜像不含源码与私人配置；网页镜像仅包含静态资源。构建上下文采用允许列表，排除 `.env` 和本地部署资料。
+本地需要构建容器时使用 `docker compose -f compose.yml -f compose.dev.yml up -d --build`。网页资源嵌入 Rust 二进制，单个镜像以非 root 用户运行，不包含 Rust 源码与私人配置。构建上下文采用允许列表，排除 `.env` 和本地部署资料。
+
+项目仍处于开发阶段，发布版本统一使用 `0.y.z`，Git tag 使用 `v0.y.z`。不兼容的架构或接口变更递增 `y`，兼容修复递增 `z`；达到稳定标准后再单独决定是否进入 `1.0.0`。发布工作流会拒绝非 `v0.y.z` 标签，并校验标签与 Cargo 版本一致。
 
 发布步骤：
 
 1. 更新 Cargo workspace 版本及 Compose、文档中的镜像标签，并更新 `Cargo.lock`。
-2. 完成上述静态检查，提交后创建相同版本的 `vX.Y.Z` tag。
-3. 在 GitHub 发布对应 Release，自动触发 `Publish container images` 工作流。
+2. 完成上述静态检查，提交后创建相同版本的 `v0.y.z` tag。
+3. 在 GitHub 发布对应 Release，自动触发 `Publish container image` 工作流。
 4. 等待 Rust / JavaScript 检查、AMD64 / ARM64 构建和多架构清单发布全部成功，再部署版本镜像。
 
-工作流使用 GitHub 提供的 `GITHUB_TOKEN` 推送 GHCR，无需配置个人访问令牌。首次发布后，将两个容器包的可见性设为 Public，使服务器无需登录就能拉取；后续版本沿用包的可见性。也可在 Actions 中选择现有版本 tag 手动重跑。公开镜像附带源码地址、版本、提交 SHA、构建来源和 SBOM。
+工作流使用 GitHub 提供的 `GITHUB_TOKEN` 推送 GHCR，无需配置个人访问令牌。首次发布后，将容器包的可见性设为 Public，使服务器无需登录就能拉取；后续版本沿用包的可见性。也可在 Actions 中选择现有版本 tag 手动重跑。公开镜像附带源码地址、版本、提交 SHA、构建来源和 SBOM。
 
 ## 许可证
 

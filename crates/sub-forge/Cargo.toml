@@ -5,11 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Stateless Mihomo subscription conversion with optional JavaScript processing"
+description = "SQLite-backed Mihomo subscription conversion with optional JavaScript processing"
 
 [dependencies]
-base64.workspace = true
-flate2.workspace = true
+rusqlite.workspace = true
+uuid.workspace = true
 ipnet.workspace = true
 axum.workspace = true
 config.workspace = true

@@ -4,8 +4,3 @@ services:
     image: sub-forge:dev
     build:
       context: .
-  sub-forge-web:
-    image: sub-forge-web:dev
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile

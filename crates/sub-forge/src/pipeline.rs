@@ -27,7 +27,7 @@ impl ConfigPipeline {
         context: Value,
         request: &ConversionRequest,
     ) -> Result<Vec<u8>, AppError> {
-        let content = self.converter.generate(request, &request.options).await?;
+        let content = self.converter.generate(request).await?;
         let mut document: Value = serde_yaml_ng::from_slice(&content)
             .map_err(|error| AppError::InvalidGeneratedConfig(error.to_string()))?;
         if !document.is_object() {

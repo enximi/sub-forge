@@ -9,6 +9,7 @@ use crate::error::StartupError;
 pub struct RuntimeConfig {
     pub public_base_url: Url,
     pub access_token: Option<String>,
+    pub database_path: std::path::PathBuf,
     pub listen_addr: SocketAddr,
     pub trusted_proxies: Vec<ipnet::IpNet>,
     pub allowed_origins: Vec<axum::http::HeaderValue>,
@@ -30,6 +31,7 @@ pub struct RuntimeConfig {
 struct EnvironmentConfig {
     sub_forge_public_base_url: String,
     sub_forge_access_token: String,
+    sub_forge_database_path: String,
     sub_forge_listen_addr: String,
     trusted_proxy_cidrs: String,
     sub_forge_allowed_origins: String,
@@ -56,6 +58,7 @@ impl RuntimeConfig {
         }
         let input: EnvironmentConfig = Config::builder()
             .set_default("sub_forge_access_token", "")?
+            .set_default("sub_forge_database_path", "data/sub-forge.sqlite3")?
             .set_default("trusted_proxy_cidrs", "")?
             .set_default("sub_forge_allowed_origins", "")?
             .set_default("requests_per_minute", 60)?
@@ -75,7 +78,16 @@ impl RuntimeConfig {
             .build()?
             .try_deserialize()?;
 
+        if input.sub_forge_database_path.trim().is_empty()
+            || input.sub_forge_database_path == ":memory:"
+        {
+            return Err(invalid(
+                "SUB_FORGE_DATABASE_PATH",
+                "must be a persistent database file path",
+            ));
+        }
         Ok(Self {
+            database_path: input.sub_forge_database_path.into(),
             access_token: access_token(input.sub_forge_access_token)?,
             allowed_origins: allowed_origins(&input.sub_forge_allowed_origins)?,
             trusted_proxies: input

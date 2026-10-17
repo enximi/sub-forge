@@ -7,7 +7,7 @@ use rquickjs::{CatchResultExt, Context, Function, Runtime};
 use serde_json::Value;
 use tokio::sync::Semaphore;
 
-use crate::{config::RuntimeConfig, error::AppError};
+use crate::{config::RuntimeConfig, error::AppError, model::UserScripts};
 
 #[derive(Clone)]
 pub struct ScriptEngine {
@@ -18,6 +18,54 @@ pub struct ScriptEngine {
 }
 
 impl ScriptEngine {
+    pub async fn validate_sources(&self, scripts: &UserScripts) -> Result<(), AppError> {
+        let scripts = scripts.clone();
+        let engine = self.clone();
+        let permit = self
+            .slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| AppError::Busy)?;
+        tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            for (stage, source) in [
+                ("subscription", scripts.subscription),
+                ("preprocess_rules", scripts.preprocess_rules),
+                ("postprocess_config", scripts.postprocess_config),
+            ] {
+                if source.len() > engine.max_source_bytes {
+                    return Err(AppError::BadRequest("脚本超出服务大小限制".into()));
+                }
+                if source.trim().is_empty() {
+                    continue;
+                }
+                let runtime = engine.runtime().map_err(|_| AppError::Internal)?;
+                let context = Context::full(&runtime).map_err(|_| AppError::Internal)?;
+                context.with(|ctx| {
+                    // Function 构造器仅编译函数体，保存链接时不会执行用户代码。
+                    let constructor: rquickjs::function::Constructor = ctx
+                        .globals()
+                        .get("Function")
+                        .map_err(|_| AppError::Internal)?;
+                    let _: Function =
+                        constructor
+                            .construct((source,))
+                            .catch(&ctx)
+                            .map_err(|error| {
+                                AppError::BadRequest(format!(
+                                    "{stage} 脚本语法错误：{}",
+                                    error.to_string().chars().take(512).collect::<String>()
+                                ))
+                            })?;
+                    Ok::<_, AppError>(())
+                })?;
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|_| AppError::Internal)?
+    }
+
     pub fn new(config: &RuntimeConfig) -> Self {
         Self {
             timeout: config.script_timeout,
@@ -25,6 +73,39 @@ impl ScriptEngine {
             max_source_bytes: config.script_max_bytes,
             slots: Arc::new(Semaphore::new(config.script_concurrency)),
         }
+    }
+
+    fn runtime(&self) -> rquickjs::Result<Runtime> {
+        let runtime = Runtime::new()?;
+        runtime.set_memory_limit(self.memory_bytes);
+        runtime.set_max_stack_size(1024 * 1024);
+        let started = Instant::now();
+        let timeout = self.timeout;
+        runtime.set_interrupt_handler(Some(Box::new(move || started.elapsed() >= timeout)));
+        Ok(runtime)
+    }
+
+    pub async fn transform_text(
+        &self,
+        source: &str,
+        stage: &'static str,
+        input: String,
+        context: Value,
+        max_bytes: usize,
+    ) -> Result<String, AppError> {
+        if source.trim().is_empty() {
+            return Ok(input);
+        }
+        let result = self
+            .execute_source(source, stage, input.into(), context, max_bytes)
+            .await?;
+        let content = result
+            .as_str()
+            .ok_or_else(|| AppError::Policy("text script must return a string".into()))?;
+        if content.len() > max_bytes {
+            return Err(AppError::ResponseTooLarge);
+        }
+        Ok(content.to_owned())
     }
 
     pub async fn execute_source(
@@ -68,12 +149,7 @@ impl ScriptEngine {
             stage,
             message: message.chars().take(512).collect(),
         };
-        let runtime = Runtime::new().map_err(|error| failure(error.to_string()))?;
-        runtime.set_memory_limit(self.memory_bytes);
-        runtime.set_max_stack_size(1024 * 1024);
-        let started = Instant::now();
-        let timeout = self.timeout;
-        runtime.set_interrupt_handler(Some(Box::new(move || started.elapsed() >= timeout)));
+        let runtime = self.runtime().map_err(|error| failure(error.to_string()))?;
         let js = Context::full(&runtime).map_err(|error| failure(error.to_string()))?;
         js.with(|ctx| {
             // 每个脚本在独立环境中运行，业务扩展不获得文件系统、网络或环境变量访问。

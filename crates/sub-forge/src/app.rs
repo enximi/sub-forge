@@ -1,11 +1,8 @@
-use std::sync::Arc;
-
 use tokio::net::TcpListener;
 use tracing::info;
 
 use crate::{
-    config::RuntimeConfig,
-    http::{AppState, api_router},
+    config::RuntimeConfig, http, links::Links, service::SubscriptionService, store::Store,
 };
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,12 +17,15 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = RuntimeConfig::load()?;
     let listen_addr = config.listen_addr;
-    let state = Arc::new(AppState::from_config(config));
+    let store = Store::open(&config.database_path)?;
+    let links = Links::new(store, config.public_base_url.clone());
+    let service = SubscriptionService::new(&config, links);
     let public = TcpListener::bind(listen_addr).await?;
     info!(public = %public.local_addr()?, "sub-forge listener");
     axum::serve(
         public,
-        api_router(state).into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        http::router(&config, service)
+            .into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
     .await?;
     Ok(())

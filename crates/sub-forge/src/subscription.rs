@@ -1,7 +1,7 @@
-use axum::http::HeaderMap;
 use reqwest::Url;
+use reqwest::header::HeaderMap;
 
-use crate::{api, error::AppError, network::PublicNetwork, upstream::read_limited_response};
+use crate::{error::AppError, network::PublicNetwork, upstream::read_limited_response};
 
 #[derive(Clone)]
 pub struct SubscriptionSource {
@@ -20,8 +20,4 @@ impl SubscriptionSource {
         let content = read_limited_response(response, self.max_bytes).await?;
         Ok((content, headers))
     }
-}
-
-pub fn public_url(base: &Url, token: &str, access_token: Option<&str>) -> Url {
-    api::url(base, &format!("subscription/{token}"), access_token)
 }
