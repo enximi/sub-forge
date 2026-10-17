@@ -96,5 +96,19 @@ export function initRulesPicker(form, onChange) {
   updateRulesMode();
   updateRulesDescription();
 
-  return { getUrl: () => form.elements.rules_mode.value === "preset" ? rulesTemplateLink.href : rulesUrl.value };
+  return {
+    getUrl: () => form.elements.rules_mode.value === "preset" ? rulesTemplateLink.href : rulesUrl.value,
+    setUrl(url) {
+      const choice = rulesChoices.find(option => option.querySelector(".rules-option-url").textContent === url);
+      form.elements.rules_mode.value = choice ? "preset" : "custom";
+      if (choice) {
+        selectedRulesPreset.setAttribute("aria-selected", "false");
+        selectedRulesPreset = choice;
+        choice.setAttribute("aria-selected", "true");
+        updateRulesDescription();
+      }
+      rulesUrl.value = url;
+      updateRulesMode();
+    },
+  };
 }

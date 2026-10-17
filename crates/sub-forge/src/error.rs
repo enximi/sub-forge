@@ -22,7 +22,7 @@ pub enum AppError {
     Internal,
     #[error("invalid subscription token")]
     Unauthorized,
-    #[error("生成 token 缺失或无效")]
+    #[error("管理 token 缺失或无效")]
     AccessDenied,
     #[error("upstream request failed: {0}")]
     UpstreamRequest(reqwest::Error),

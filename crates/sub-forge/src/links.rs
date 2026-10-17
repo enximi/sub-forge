@@ -15,6 +15,13 @@ pub struct SavedLink {
     pub url: String,
 }
 
+#[derive(Serialize)]
+pub struct EditableSubscription {
+    #[serde(flatten)]
+    link: SavedLink,
+    config: SubscriptionConfig,
+}
+
 #[derive(Clone)]
 pub struct Links {
     store: Store,
@@ -53,6 +60,34 @@ impl Links {
             StoredLink::Feed(config) => Ok(config),
             _ => Err(AppError::Unauthorized),
         }
+    }
+
+    pub async fn load_subscription(&self, raw_url: &str) -> Result<EditableSubscription, AppError> {
+        let invalid = || AppError::BadRequest("请填写本站生成的完整订阅链接".into());
+        let url = Url::parse(raw_url.trim()).map_err(|_| invalid())?;
+        let id = url.path().rsplit('/').next().ok_or_else(invalid)?;
+        if url != self.url(LinkKind::Feed, id) {
+            return Err(invalid());
+        }
+        Ok(EditableSubscription {
+            config: self.feed(id).await?,
+            link: SavedLink {
+                id: id.to_owned(),
+                url: url.to_string(),
+            },
+        })
+    }
+
+    pub async fn update_subscription(
+        &self,
+        id: &str,
+        config: SubscriptionConfig,
+    ) -> Result<SavedLink, AppError> {
+        self.store.update_feed(id, config).await?;
+        Ok(SavedLink {
+            id: id.to_owned(),
+            url: self.url(LinkKind::Feed, id).to_string(),
+        })
     }
 
     pub async fn source(&self, id: &str, kind: LinkKind) -> Result<SourceConfig, AppError> {

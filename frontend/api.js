@@ -39,10 +39,10 @@ async function request(url, options, signal, timeoutMs, read) {
   }
 }
 
-export async function createSubscription(accessToken, config, signal) {
+async function subscriptionRequest(path, method, accessToken, body, signal) {
   const headers = { "Content-Type": "application/json", ...authorization(accessToken) };
-  const result = await request(endpoint("subscriptions"), {
-    method: "POST", headers, body: JSON.stringify(config),
+  const result = await request(endpoint(path), {
+    method, headers, body: JSON.stringify(body),
   }, signal, 30000, async response => {
     try { return await response.json(); } catch {
       throw new Error("后端返回了无效的 JSON 响应。");
@@ -53,6 +53,18 @@ export async function createSubscription(accessToken, config, signal) {
     throw new Error("后端未返回有效的订阅地址。");
   }
   return result;
+}
+
+export function createSubscription(accessToken, config, signal) {
+  return subscriptionRequest("subscriptions", "POST", accessToken, config, signal);
+}
+
+export function loadSubscription(accessToken, url, signal) {
+  return subscriptionRequest("subscriptions/load", "POST", accessToken, { url }, signal);
+}
+
+export function updateSubscription(id, accessToken, config, signal) {
+  return subscriptionRequest(`subscriptions/${id}`, "PUT", accessToken, config, signal);
 }
 
 export function downloadConfiguration(id, signal) {

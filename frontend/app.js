@@ -1,4 +1,4 @@
-import { createSubscription, downloadConfiguration } from "./api.js";
+import { createSubscription, loadSubscription, updateSubscription, downloadConfiguration } from "./api.js";
 import { initRulesPicker } from "./rules-picker.js";
 
 const form = document.querySelector("#subscription-form");
@@ -8,6 +8,11 @@ const resultUrl = document.querySelector("#result-url");
 const generateButton = document.querySelector("#generate-button");
 const downloadButton = document.querySelector("#download-button");
 const helpDialog = document.querySelector("#help-dialog");
+const existingUrl = document.querySelector("#existing-url");
+const loadButton = document.querySelector("#load-button");
+const updatePanel = document.querySelector("#update-panel");
+const editingNote = document.querySelector("#editing-note");
+let editingSubscription;
 let revision = 0;
 let generatedSubscription;
 let generationController;
@@ -19,16 +24,27 @@ function showStatus(message, error = false) {
   status.hidden = false;
 }
 
+function isUpdateMode() {
+  return form.elements.subscription_mode.value === "update";
+}
+
 function stopGeneration() {
   generationController?.abort();
   generationController = undefined;
-  generateButton.disabled = false;
-  generateButton.textContent = "生成订阅地址";
+  const updating = isUpdateMode();
+  updatePanel.hidden = !updating;
+  existingUrl.disabled = !updating;
+  generateButton.disabled = updating && !editingSubscription;
+  generateButton.textContent = updating ? "保存到原链接" : "生成订阅地址";
+  loadButton.disabled = false;
+  loadButton.textContent = "载入配置";
+  editingNote.hidden = !editingSubscription;
   form.removeAttribute("aria-busy");
 }
 
 function invalidate(event) {
   if (event.target === resultUrl) return;
+  if (event.target === existingUrl || event.target.name === "subscription_mode") editingSubscription = undefined;
   // 输入变化即作废旧结果并终止异步任务，避免迟到的结果覆盖新配置。
   revision++;
   stopGeneration();
@@ -49,6 +65,54 @@ form.addEventListener("change", invalidate);
 form.addEventListener("invalid", (event) => event.target.setAttribute("aria-invalid", "true"), true);
 
 const rulesPicker = initRulesPicker(form, invalidate);
+
+loadButton.addEventListener("click", async () => {
+  if (!isUpdateMode()) return;
+  if (!existingUrl.value.trim() || !existingUrl.reportValidity()) {
+    showStatus("请先填写已有的 SubForge 订阅链接。", true);
+    existingUrl.focus();
+    return;
+  }
+  invalidate({ target: existingUrl });
+  const current = revision;
+  const controller = new AbortController();
+  generationController = controller;
+  loadButton.disabled = true;
+  loadButton.textContent = "正在载入…";
+  generateButton.disabled = true;
+  form.setAttribute("aria-busy", "true");
+  showStatus("正在验证 token 并载入配置…");
+  try {
+    const output = await loadSubscription(form.elements.access_token.value, existingUrl.value, controller.signal);
+    if (current !== revision) return;
+    const config = output.config;
+    form.elements.source.value = config.source_url;
+    form.elements.converter.value = config.converter_url;
+    rulesPicker.setUrl(config.policy.rules.source_url);
+    for (const name of ["emoji", "tfo", "scv", "fdn", "expand", "sort", "new_name"]) {
+      form.elements[name].checked = config.policy.converter[name];
+    }
+    form.elements.interval.value = config.policy.converter.interval_secs;
+    for (const name of ["subscription", "preprocess_rules", "postprocess_config"]) {
+      form.elements[name].value = config.scripts[name];
+    }
+    for (const element of form.elements) {
+      element.setCustomValidity?.("");
+      element.removeAttribute("aria-invalid");
+    }
+    editingSubscription = { id: output.id, url: output.url };
+    existingUrl.value = output.url;
+    showStatus("配置已载入。修改后保存到原链接，客户端无需更换订阅地址。");
+    scrollTo(document.querySelector("#subscription-heading"));
+  } catch (error) {
+    if (current === revision) {
+      showStatus(error.message, true);
+      scrollTo(status);
+    }
+  } finally {
+    if (current === revision) stopGeneration();
+  }
+});
 
 function scrollTo(element) {
   element.scrollIntoView({
@@ -78,6 +142,11 @@ function readForm() {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (isUpdateMode() && !editingSubscription) {
+    showStatus("请先载入需要更新的订阅配置。", true);
+    existingUrl.focus();
+    return;
+  }
   stopGeneration();
   downloadController?.abort();
   downloadButton.disabled = false;
@@ -87,10 +156,12 @@ form.addEventListener("submit", async (event) => {
   resultUrl.value = "";
   generatedSubscription = undefined;
   const input = readForm();
+  const target = isUpdateMode() ? editingSubscription : undefined;
   generateButton.disabled = true;
-  generateButton.textContent = "正在生成…";
+  loadButton.disabled = true;
+  generateButton.textContent = target ? "正在保存…" : "正在生成…";
   form.setAttribute("aria-busy", "true");
-  showStatus("正在保存参数并生成订阅地址…");
+  showStatus(target ? "正在更新原链接的配置…" : "正在保存参数并生成订阅地址…");
 
   function fail(message, field) {
     if (current !== revision) return;
@@ -110,13 +181,17 @@ form.addEventListener("submit", async (event) => {
   const controller = new AbortController();
   generationController = controller;
   try {
-    const output = await createSubscription(input.accessToken, input.config, controller.signal);
+    const output = target
+      ? await updateSubscription(target.id, input.accessToken, input.config, controller.signal)
+      : await createSubscription(input.accessToken, input.config, controller.signal);
     if (current !== revision) return;
+    editingSubscription = target ? output : undefined;
+    existingUrl.value = output.url;
     stopGeneration();
     generatedSubscription = output;
     resultUrl.value = output.url;
     result.hidden = false;
-    showStatus(`订阅地址已生成（${output.url.length} 字符），可以复制到客户端使用。`);
+    showStatus(target ? "配置已保存，订阅地址保持不变。请在客户端更新整份订阅以应用修改。" : `订阅地址已生成（${output.url.length} 字符），可以复制到客户端使用。`);
     scrollTo(result);
   } catch (error) {
     if (current !== revision) return;

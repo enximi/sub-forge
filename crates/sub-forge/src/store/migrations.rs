@@ -49,8 +49,24 @@ pub fn apply(connection: &mut Connection) -> Result<(), Box<dyn std::error::Erro
             }
             transaction.pragma_update(None, "user_version", 1)?;
         }
-        1 => {}
+        1 | 2 => {}
         _ => return Err("database schema is newer than this application".into()),
+    }
+    if version < 2 {
+        // 可编辑订阅独立保存，仅不可变的取源和规则回调按内容去重。
+        transaction.execute_batch(
+            "CREATE TABLE links_next (
+                 id TEXT PRIMARY KEY NOT NULL,
+                 payload TEXT NOT NULL,
+                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+             );
+             INSERT INTO links_next SELECT id, payload, created_at FROM links;
+             DROP TABLE links;
+             ALTER TABLE links_next RENAME TO links;
+             CREATE UNIQUE INDEX links_callback_payload ON links(payload)
+                 WHERE json_extract(payload, '$.kind') != 'feed';
+             PRAGMA user_version = 2;",
+        )?;
     }
     transaction.commit()?;
     Ok(())

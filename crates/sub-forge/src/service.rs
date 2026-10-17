@@ -8,7 +8,7 @@ use crate::{
     config::RuntimeConfig,
     converter::{ConversionRequest, Converter},
     error::AppError,
-    links::{Links, SavedLink},
+    links::{EditableSubscription, Links, SavedLink},
     model::{LinkKind, SourceConfig, StoredLink, SubscriptionConfig},
     network::PublicNetwork,
     pipeline::ConfigPipeline,
@@ -62,6 +62,21 @@ impl SubscriptionService {
         config.normalize()?;
         self.scripts.validate_sources(&config.scripts).await?;
         self.links.save(StoredLink::Feed(config)).await
+    }
+
+    pub async fn load_subscription(&self, url: &str) -> Result<EditableSubscription, AppError> {
+        self.links.load_subscription(url).await
+    }
+
+    pub async fn update(
+        &self,
+        id: &str,
+        mut config: SubscriptionConfig,
+    ) -> Result<SavedLink, AppError> {
+        let _permit = self.fetches.try_acquire().map_err(|_| AppError::Busy)?;
+        config.normalize()?;
+        self.scripts.validate_sources(&config.scripts).await?;
+        self.links.update_subscription(id, config).await
     }
 
     pub async fn generate(&self, id: &str) -> Result<Vec<u8>, AppError> {

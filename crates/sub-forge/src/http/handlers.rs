@@ -9,6 +9,30 @@ use axum::{
 
 use super::HttpState;
 use crate::{error::AppError, model::SubscriptionConfig};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct SubscriptionLink {
+    url: String,
+}
+
+pub(super) async fn load(
+    State(state): State<Arc<HttpState>>,
+    input: Result<Json<SubscriptionLink>, JsonRejection>,
+) -> Result<impl IntoResponse, AppError> {
+    let Json(input) = input.map_err(|error| AppError::BadRequest(error.body_text()))?;
+    Ok(Json(state.service.load_subscription(&input.url).await?))
+}
+
+pub(super) async fn update(
+    State(state): State<Arc<HttpState>>,
+    Path(id): Path<String>,
+    input: Result<Json<SubscriptionConfig>, JsonRejection>,
+) -> Result<impl IntoResponse, AppError> {
+    let Json(input) = input.map_err(|error| AppError::BadRequest(error.body_text()))?;
+    Ok(Json(state.service.update(&id, input).await?))
+}
 
 pub(super) async fn health() -> StatusCode {
     StatusCode::NO_CONTENT

@@ -9,7 +9,7 @@ use axum::{
     Router,
     extract::DefaultBodyLimit,
     http::{Method, header},
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
@@ -31,19 +31,22 @@ pub fn router(config: &RuntimeConfig, service: SubscriptionService) -> Router {
     });
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::list(config.allowed_origins.clone()))
-        .allow_methods([Method::GET, Method::POST])
+        .allow_methods([Method::GET, Method::POST, Method::PUT])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
     frontend::routes()
         .route("/health", get(handlers::health))
         .nest(
             API_PREFIX,
             Router::new()
-                .route(
-                    "/subscriptions",
-                    post(handlers::create).route_layer(axum::middleware::from_fn_with_state(
-                        state.clone(),
-                        middleware::authorize_generation,
-                    )),
+                .merge(
+                    Router::new()
+                        .route("/subscriptions", post(handlers::create))
+                        .route("/subscriptions/load", post(handlers::load))
+                        .route("/subscriptions/{id}", put(handlers::update))
+                        .route_layer(axum::middleware::from_fn_with_state(
+                            state.clone(),
+                            middleware::authorize_management,
+                        )),
                 )
                 .route("/clash/{id}", get(handlers::clash))
                 .route("/subscription/{id}", get(handlers::subscription))

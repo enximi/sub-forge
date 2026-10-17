@@ -43,7 +43,7 @@ pub(super) async fn protect(
     response
 }
 
-pub(super) async fn authorize_generation(
+pub(super) async fn authorize_management(
     State(state): State<Arc<HttpState>>,
     request: Request,
     next: Next,
@@ -74,7 +74,7 @@ fn authorize(expected: Option<&str>, request: &Request) -> Result<(), AppError> 
         })
         .transpose()?
         .ok_or(AppError::AccessDenied)?;
-    // 仅接受一个 Bearer 请求头，生成凭据不从 URL 读取。
+    // 仅接受一个 Bearer 请求头，管理凭据不从 URL 读取。
     if credentials.next().is_some() || !bool::from(expected.as_bytes().ct_eq(bearer.as_bytes())) {
         return Err(AppError::AccessDenied);
     }

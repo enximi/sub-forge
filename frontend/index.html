@@ -18,12 +18,33 @@
 
     <main>
       <div class="page-heading">
-        <h1>生成订阅链接</h1>
-        <p>填写订阅信息，按需添加脚本，再生成并复制链接到 Clash / Mihomo 客户端。</p>
+        <h1>管理订阅配置</h1>
+        <p>创建新的订阅，或载入已有链接，修改配置并保持链接不变。</p>
       </div>
       <noscript><p class="status error">请启用 JavaScript，以便提交参数并生成订阅链接。</p></noscript>
 
       <form id="subscription-form" autocomplete="off">
+        <section aria-labelledby="manage-heading">
+          <h2 id="manage-heading" class="visually-hidden">订阅管理</h2>
+          <div class="segmented-control management-switch" role="radiogroup" aria-labelledby="manage-heading">
+            <label><input type="radio" name="subscription_mode" value="create" checked><span>新建订阅</span></label>
+            <label><input type="radio" name="subscription_mode" value="update"><span>更新订阅</span></label>
+          </div>
+          <div class="field">
+            <label for="access-token">管理 token（按部署要求填写）</label>
+            <input id="access-token" name="access_token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="256" placeholder="公开服务留空" aria-describedby="access-token-help">
+            <p class="hint" id="access-token-help">生成、载入和更新配置时验证，访问订阅无需 token。</p>
+          </div>
+          <div id="update-panel" hidden>
+            <div class="field">
+              <label for="existing-url">已有的 SubForge 订阅链接</label>
+              <input id="existing-url" type="url" disabled spellcheck="false" placeholder="粘贴本站生成的订阅短链接" aria-describedby="existing-help">
+              <p class="hint" id="existing-help">填写链接后载入配置，修改脚本或参数即可保存到原链接。</p>
+            </div>
+            <button id="load-button" class="secondary-button" type="button">载入配置</button>
+            <p id="editing-note" class="hint" role="status" hidden>正在编辑已有订阅，保存后链接不变。客户端下次更新整份订阅时生效。</p>
+          </div>
+        </section>
         <section aria-labelledby="subscription-heading">
           <h2 id="subscription-heading">订阅配置</h2>
           <div class="field">
@@ -33,7 +54,7 @@
           </div>
           <fieldset class="field rules-fieldset">
             <legend>规则模板</legend>
-            <div class="rules-source-switch">
+            <div class="segmented-control">
               <label><input type="radio" name="rules_mode" value="preset" checked><span>ACL4SSR 预设</span></label>
               <label><input type="radio" name="rules_mode" value="custom"><span>自定义链接</span></label>
             </div>
@@ -144,11 +165,6 @@
             <input id="converter-url" name="converter" type="url" required spellcheck="false" placeholder="https://converter.example.com/sub" aria-describedby="converter-help">
             <p class="hint" id="converter-help">需可从公网访问。转换器会获得订阅内容，请选择可信服务。</p>
           </div>
-          <div class="field">
-            <label for="access-token">生成 token（按部署要求填写）</label>
-            <input id="access-token" name="access_token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="256" placeholder="公开服务留空" aria-describedby="access-token-help">
-            <p class="hint" id="access-token-help">仅生成链接时验证，不会写入订阅地址。持有链接即可访问，请妥善保管。</p>
-          </div>
         </section>
 
         <section aria-labelledby="options-heading">
@@ -196,9 +212,11 @@
         </section>
 
         <section class="generate-section" aria-labelledby="generate-heading">
-          <h2 id="generate-heading">生成与复制</h2>
-          <p class="section-description">参数和脚本将保存到后端，并生成订阅短链接。修改输入后，需要重新生成。</p>
-          <button class="primary-button" id="generate-button" type="submit">生成订阅地址</button>
+          <h2 id="generate-heading">保存与复制</h2>
+          <p class="section-description">新建会生成独立链接；更新会保存到已载入的原链接。切换到“新建订阅”可将当前配置另存为新链接。</p>
+          <div class="actions">
+            <button class="primary-button" id="generate-button" type="submit">生成订阅地址</button>
+          </div>
           <p class="status" id="status" role="status" aria-live="polite" hidden></p>
           <div id="result" hidden>
             <div class="field">
@@ -221,9 +239,9 @@
       <ol>
         <li>填写订阅、规则模板和转换器地址。</li>
         <li>调整转换选项，按需填写三个处理脚本。</li>
-        <li>点击“生成订阅地址”，复制到 Clash / Mihomo 客户端；也可以下载 YAML 配置。</li>
+        <li>新建时点击“生成订阅地址”；编辑已有订阅时粘贴短链接并载入，修改后点击“保存到原链接”。</li>
       </ol>
-      <p>页面输入刷新后清空；点击生成会将参数和脚本保存到后端，返回可持续使用的短链接。请妥善保管订阅地址。</p>
+      <p>页面输入刷新后清空，可凭原链接和管理 token 重新载入。更新保存成功后，客户端下次更新整份订阅即可获取新配置。另存为新链接不会修改原订阅。请妥善保管订阅地址。</p>
       <p>脚本需定义同步 transform(input, context)，没有网络、文件系统、Node.js 或 npm，不支持 async。后端生成链接时检查语法，使用链接时才执行脚本和公网地址检查。</p>
       <p>三个脚本合计最多 64 KiB，链接长度不会随脚本增长。生成成功不代表上游可访问或脚本执行成功。</p>
       <form method="dialog"><button class="primary-button">知道了</button></form>

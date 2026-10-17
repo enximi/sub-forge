@@ -9,7 +9,10 @@ use std::{
 use rusqlite::{Connection, OptionalExtension, params};
 use uuid::Uuid;
 
-use crate::{error::AppError, model::StoredLink};
+use crate::{
+    error::AppError,
+    model::{StoredLink, SubscriptionConfig},
+};
 
 #[derive(Clone)]
 pub struct Store {
@@ -41,14 +44,21 @@ impl Store {
     }
 
     pub async fn save(&self, record: StoredLink) -> Result<String, AppError> {
+        let editable = matches!(record, StoredLink::Feed(_));
         let payload = serde_json::to_string(&record).map_err(|_| AppError::Internal)?;
         self.run(move |connection| {
-            // 随机 ID 不携带配置；相同内容复用记录，刷新和请求重试不会持续增加数据。
+            // 新订阅始终独立；不可变回调复用已有记录。
             let id = Uuid::new_v4().simple().to_string();
-            connection.execute(
-                "INSERT INTO links (id, payload) VALUES (?1, ?2) ON CONFLICT(payload) DO NOTHING",
-                params![id, payload],
-            ).map_err(database_error)?;
+            connection
+                .execute(
+                    "INSERT INTO links (id, payload) VALUES (?1, ?2)
+                 ON CONFLICT(payload) WHERE json_extract(payload, '$.kind') != 'feed' DO NOTHING",
+                    params![id, payload],
+                )
+                .map_err(database_error)?;
+            if editable {
+                return Ok(id);
+            }
             connection
                 .query_row(
                     "SELECT id FROM links WHERE payload = ?1",
@@ -58,6 +68,20 @@ impl Store {
                 .map_err(database_error)
         })
         .await
+    }
+
+    pub async fn update_feed(&self, id: &str, config: SubscriptionConfig) -> Result<(), AppError> {
+        let id = id.to_owned();
+        let payload =
+            serde_json::to_string(&StoredLink::Feed(config)).map_err(|_| AppError::Internal)?;
+        self.run(move |connection| {
+            let changed = connection.execute(
+                "UPDATE links SET payload = ?1 WHERE id = ?2 AND json_extract(payload, '$.kind') = 'feed'",
+                params![payload, id],
+            ).map_err(database_error)?;
+            if changed == 0 { return Err(AppError::Unauthorized); }
+            Ok(())
+        }).await
     }
 
     pub async fn load(&self, id: &str) -> Result<StoredLink, AppError> {

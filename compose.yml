@@ -1,6 +1,6 @@
 services:
   sub-forge:
-    image: ghcr.io/enximi/sub-forge:v0.1.0
+    image: ghcr.io/enximi/sub-forge:v0.2.0
     restart: unless-stopped
     ports:
       - "127.0.0.1:8002:8080"
@@ -9,7 +9,7 @@ services:
       SUB_FORGE_PUBLIC_BASE_URL: https://sub.example.com
       SUB_FORGE_DATABASE_PATH: /app/data/sub-forge.sqlite3
       SUB_FORGE_LISTEN_ADDR: 0.0.0.0:8080
-      # 留空公开生成；填写后仅生成接口验证 token（32 至 256 个可打印 ASCII 字符，无空白）。
+      # 留空公开管理；填写后生成、载入和更新接口均验证 token（32 至 256 个可打印 ASCII 字符，无空白）。
       SUB_FORGE_ACCESS_TOKEN: ""
       SUB_FORGE_TIMEOUT_SECS: 60
       SUB_FORGE_RULES_TIMEOUT_SECS: 30
