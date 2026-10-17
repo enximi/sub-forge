@@ -1,0 +1,11 @@
+# 与主配置一起使用：docker compose -f compose.yml -f compose.dev.yml up -d --build
+services:
+  sub-forge:
+    image: sub-forge:dev
+    build:
+      context: .
+  sub-forge-web:
+    image: sub-forge-web:dev
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile

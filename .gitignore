@@ -1,0 +1,12 @@
+/target
+/sub-store-data
+compose*.before-*
+
+/.env
+/.env.*
+!/.env.example
+/config.local
+/outputs
+.DS_Store
+*.pem
+*.key

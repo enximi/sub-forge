@@ -1,0 +1,17 @@
+# 构建上下文仅允许公开源码，避免复制本地配置和部署资料。
+**
+!Cargo.toml
+!Cargo.lock
+!Dockerfile
+!crates/
+!crates/sub-forge/
+!crates/sub-forge/Cargo.toml
+!crates/sub-forge/src/
+!crates/sub-forge/src/**
+!frontend/
+!frontend/Dockerfile
+!frontend/nginx.conf
+!frontend/index.html
+!frontend/styles.css
+!frontend/app.js
+!frontend/generator-worker.js
