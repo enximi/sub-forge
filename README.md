@@ -152,18 +152,17 @@ YAML 经对象解析后重新序列化，注释、锚点写法和排版不会保
 | --- | --- | --- |
 | Linux | x86_64 | `sub-forge-vX.Y.Z-x86_64-unknown-linux-gnu.tar.gz` |
 | Linux | aarch64 | `sub-forge-vX.Y.Z-aarch64-unknown-linux-gnu.tar.gz` |
-| Linux | armv7 | `sub-forge-vX.Y.Z-armv7-unknown-linux-gnueabihf.tar.gz` |
 | macOS | Intel | `sub-forge-vX.Y.Z-x86_64-apple-darwin.tar.gz` |
 | macOS | Apple Silicon | `sub-forge-vX.Y.Z-aarch64-apple-darwin.tar.gz` |
 | Windows | x86_64 | `sub-forge-vX.Y.Z-x86_64-pc-windows-msvc.zip` |
 
 Linux 可执行文件在 Debian 11 环境构建，要求 glibc 2.31 或更新版本。macOS 包内的二进制已做 ad-hoc 签名；如果被 Gatekeeper 隔离，可执行 `xattr -d com.apple.quarantine sub-forge` 后运行。每个 Release 提供 `SHA256SUMS` 供下载后校验。
 
-容器镜像与 Linux 可执行文件覆盖完全相同的架构：`linux/amd64`、`linux/arm64`、`linux/arm/v7`。macOS 和 Windows 无法以容器形式发布，因此只提供独立可执行文件。
+容器镜像与 Linux 可执行文件覆盖完全相同的架构：`linux/amd64`、`linux/arm64`。macOS 和 Windows 无法以容器形式发布，因此只提供独立可执行文件。
 
 ## 单容器部署
 
-程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 `linux/amd64`、`linux/arm64` 和 `linux/arm/v7`。当前版本为 `0.4.0`。需要从源码构建时使用：
+程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 `linux/amd64`、`linux/arm64`。当前版本为 `0.4.0`。需要从源码构建时使用：
 
 ```bash
 docker compose -f compose.yml -f compose.dev.yml up -d --build --wait

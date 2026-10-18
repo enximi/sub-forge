@@ -12,7 +12,7 @@
 
 ### 发布文件与镜像
 
-[GitHub Releases](https://github.com/enximi/sub-forge/releases/latest) 提供 Linux `x86_64` / `aarch64` / `armv7`、macOS Intel / Apple Silicon 和 Windows `x86_64` 的独立可执行文件，以及 `SHA256SUMS`。Linux 文件要求 glibc 2.31 或更新版本。容器镜像 `ghcr.io/enximi/sub-forge` 覆盖与 Linux 可执行文件相同的三种架构；macOS 和 Windows 只提供独立可执行文件。
+[GitHub Releases](https://github.com/enximi/sub-forge/releases/latest) 提供 Linux `x86_64` / `aarch64`、macOS Intel / Apple Silicon 和 Windows `x86_64` 的独立可执行文件，以及 `SHA256SUMS`。Linux 文件要求 glibc 2.31 或更新版本。容器镜像 `ghcr.io/enximi/sub-forge` 覆盖与 Linux 可执行文件相同的两种架构；macOS 和 Windows 只提供独立可执行文件。
 
 ### Docker Compose
 
