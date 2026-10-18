@@ -14,6 +14,7 @@ const STYLES: &str = include_str!("../../../../frontend/styles.css");
 const APP: &str = include_str!("../../../../frontend/app.js");
 const API: &str = include_str!("../../../../frontend/api.js");
 const RULES_PICKER: &str = include_str!("../../../../frontend/rules-picker.js");
+const QR_CREATOR: &str = include_str!("../../../../frontend/qr-creator.min.js");
 
 pub(super) fn routes() -> Router<Arc<HttpState>> {
     Router::new()
@@ -26,6 +27,7 @@ pub(super) fn routes() -> Router<Arc<HttpState>> {
         .route("/app.js", get(|| javascript(APP)))
         .route("/api.js", get(|| javascript(API)))
         .route("/rules-picker.js", get(|| javascript(RULES_PICKER)))
+        .route("/qr-creator.min.js", get(|| javascript(QR_CREATOR)))
 }
 
 async fn index(State(state): State<Arc<HttpState>>) -> impl IntoResponse {

@@ -15,3 +15,5 @@
 !frontend/app.js
 !frontend/api.js
 !frontend/rules-picker.js
+!frontend/qr-creator.min.js
+!frontend/qr-creator.LICENSE

@@ -8,6 +8,7 @@
     <title>SubForge · 订阅转换</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="./styles.css">
+    <script src="./qr-creator.min.js"></script>
     <script type="module" src="./app.js"></script>
   </head>
   <body data-1p-ignore data-op-ignore>
@@ -39,31 +40,43 @@
           </div>
           <div class="field" id="access-token-field">
             <label for="access-token">管理 token</label>
-            <input id="access-token" name="access_token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="256" placeholder="填写部署时设置的管理 token" aria-describedby="access-token-help" data-1p-ignore data-op-ignore data-bwignore data-lpignore="true">
-            <p class="hint" id="access-token-help">此部署已启用管理鉴权，生成、载入和更新配置时需要填写；访问订阅无需 token。</p>
+            <div class="password-input">
+              <input id="access-token" name="access_token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="256" placeholder="填写部署时设置的管理 token" aria-describedby="access-token-help" data-1p-ignore data-op-ignore data-bwignore data-lpignore="true">
+              <button class="password-toggle" id="toggle-token" type="button" aria-label="显示管理 token" aria-pressed="false">
+                <svg class="eye" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2.5"/></svg>
+                <svg class="eye-off" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 14 14M8.5 5.4A8.7 8.7 0 0 1 10 5c5 0 8 5 8 5a13.6 13.6 0 0 1-2.2 2.8M6.2 6.7C3.6 8.2 2 10 2 10s3 5 8 5a8.9 8.9 0 0 0 3.3-.6"/><path d="M8.7 8.7a1.8 1.8 0 0 0 2.6 2.6"/></svg>
+              </button>
+            </div>
+            <p class="field-badge" id="access-token-help">
+              <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.8a3 3 0 0 1 6 0V9"/></svg>
+              管理鉴权已启用
+            </p>
           </div>
           <div id="update-panel" hidden>
             <div class="field">
               <label for="existing-url">已有的 SubForge 订阅链接</label>
-              <input id="existing-url" type="url" disabled spellcheck="false" placeholder="粘贴本站生成的订阅短链接" aria-describedby="existing-help">
-              <p class="hint" id="existing-help">填写链接后载入配置，修改脚本或参数即可保存到原链接。</p>
+              <input id="existing-url" type="url" disabled spellcheck="false" placeholder="粘贴本站生成的订阅短链接">
             </div>
-            <button id="load-button" class="secondary-button" type="button">载入配置</button>
+            <button id="load-button" class="secondary-button" type="button">
+              <span class="button-spinner" aria-hidden="true"></span>
+              <span class="button-label">载入配置</span>
+            </button>
             <p id="load-error" class="status error inline-error" role="alert" hidden></p>
-            <p id="editing-note" class="hint" role="status" hidden>正在编辑已有订阅，保存后链接不变。客户端下次更新整份订阅时生效。</p>
+            <p id="editing-note" class="editing-badge" role="status" title="保存后链接不变，客户端下次更新整份订阅后生效" hidden>
+              <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.2 11.8 11.8 8.2M7.4 6.1l1.1-1.1a3.4 3.4 0 0 1 4.8 4.8l-1.1 1.1M12.6 13.9l-1.1 1.1a3.4 3.4 0 0 1-4.8-4.8l1.1-1.1"/></svg>
+              正在编辑原链接
+            </p>
           </div>
         </section>
         <section aria-labelledby="subscription-heading">
           <h2 id="subscription-heading">订阅配置</h2>
           <div class="field">
             <label for="source-url">订阅链接</label>
-            <textarea id="source-url" name="source" rows="3" required spellcheck="false" placeholder="https://example.com/subscribe" aria-describedby="source-help"></textarea>
-            <p class="hint" id="source-help">支持普通订阅和 Sub-Store 聚合链接。</p>
+            <textarea id="source-url" name="source" rows="3" required spellcheck="false" placeholder="https://example.com/subscribe"></textarea>
           </div>
           <div class="field">
             <label for="filename">配置文件名称 <span class="optional">可选</span></label>
-            <input id="filename" name="filename" type="text" maxlength="64" spellcheck="false" placeholder="sub-forge" aria-describedby="filename-help">
-            <p class="hint" id="filename-help">不含扩展名，留空使用 sub-forge。下载配置为“名称.yaml”，原始订阅为“名称.txt”。</p>
+            <input id="filename" name="filename" type="text" maxlength="64" spellcheck="false" placeholder="sub-forge">
           </div>
           <fieldset class="field rules-fieldset">
             <legend>规则模板</legend>
@@ -79,6 +92,16 @@
                   <span aria-hidden="true">⌄</span>
                 </button>
                 <div id="rules-preset-list" class="rules-preset-list" role="listbox" aria-labelledby="rules-preset-label" hidden>
+                  <div class="rules-search">
+                    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="9" r="5.2"/><path d="m13 13 4 4"/></svg>
+                    <label class="visually-hidden" for="rules-search">搜索模板</label>
+                    <input id="rules-search" type="search" placeholder="搜索模板或 URL" autocomplete="off" spellcheck="false">
+                  </div>
+                  <div id="rules-favorites-group" class="rules-group" role="group" aria-labelledby="rules-favorites-label" hidden>
+                    <p class="rules-group-label" id="rules-favorites-label">收藏</p>
+                    <div id="rules-favorites-list"></div>
+                  </div>
+                  <p id="rules-empty" class="rules-empty" hidden>没有匹配的模板</p>
                   <div role="group" aria-labelledby="rules-group-0">
                     <p class="rules-group-label" id="rules-group-0">ACL4SSR · 标准版</p>
                     <button class="rules-preset-option" type="button" role="option" aria-selected="true" tabindex="-1" data-description="包含广告拦截、自动测速和苹果、微软分流，适合日常使用。">
@@ -164,6 +187,7 @@
               </div>
               <div class="rules-preset-meta">
                 <p id="rules-preset-description" aria-live="polite"></p>
+                <button id="rules-favorite" class="text-button rules-favorite" type="button" aria-pressed="false">☆ 收藏</button>
                 <a id="rules-template-link" href="https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online.ini" target="_blank" rel="noopener noreferrer">查看模板 ↗</a>
               </div>
             </div>
@@ -176,7 +200,10 @@
           <div class="field">
             <label for="converter-url">转换器地址</label>
             <input id="converter-url" name="converter" type="url" required spellcheck="false" placeholder="https://converter.example.com/sub" aria-describedby="converter-help">
-            <p class="hint" id="converter-help">需可从公网访问。转换器会获得订阅内容，请选择可信服务。</p>
+            <p class="field-badge" id="converter-help">
+              <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M10 9.2v4M10 6.4v.1"/></svg>
+              公网可访问 · 转换器可见订阅内容
+            </p>
           </div>
         </section>
 
@@ -192,9 +219,18 @@
             <label><input name="new_name" type="checkbox" checked>使用新版 Clash 字段名</label>
           </div>
           <div class="field interval-field">
-            <label for="interval">订阅刷新间隔（秒）</label>
-            <input id="interval" name="interval" type="number" min="60" max="604800" step="1" value="86400" required aria-describedby="interval-help">
-            <p class="hint" id="interval-help">60–604800 秒，默认 86400 秒（1 天）。</p>
+            <span class="field-label">订阅刷新间隔</span>
+            <div class="segmented-control interval-presets" role="radiogroup" aria-label="订阅刷新间隔">
+              <label><input type="radio" name="interval_preset" value="3600"><span>1 小时</span></label>
+              <label><input type="radio" name="interval_preset" value="21600"><span>6 小时</span></label>
+              <label><input type="radio" name="interval_preset" value="86400" checked><span>1 天</span></label>
+              <label><input type="radio" name="interval_preset" value="custom"><span>自定义</span></label>
+            </div>
+            <input id="interval" name="interval" type="hidden" value="86400">
+            <div id="interval-custom" class="interval-custom" hidden>
+              <input id="interval-custom-value" type="number" min="60" max="604800" step="1" value="86400" inputmode="numeric" aria-label="自定义刷新间隔（秒）" required disabled>
+              <span class="interval-unit">秒</span>
+            </div>
           </div>
         </section>
 
@@ -205,47 +241,88 @@
             <label for="subscription-script">原始订阅脚本</label>
             <textarea class="code" id="subscription-script" name="subscription" rows="5" spellcheck="false" autocapitalize="off" placeholder="function transform(input, context) {
   return input;
-}" aria-describedby="subscription-script-help"></textarea>
-            <p class="hint" id="subscription-script-help">转换器取订阅或客户端刷新 provider 时执行，输入和返回值都是文本。</p>
+}"></textarea>
           </div>
           <div class="field">
             <label for="rules-script">规则预处理脚本</label>
             <textarea class="code" id="rules-script" name="preprocess_rules" rows="5" spellcheck="false" autocapitalize="off" placeholder="function transform(input, context) {
   return input;
-}" aria-describedby="rules-script-help"></textarea>
-            <p class="hint" id="rules-script-help">转换器获取 INI 时执行，输入和返回值都是文本；前置规则和代理组配置写在这里。</p>
+}"></textarea>
           </div>
           <div class="field">
             <label for="config-script">后处理脚本</label>
             <textarea class="code" id="config-script" name="postprocess_config" rows="5" spellcheck="false" autocapitalize="off" placeholder="function transform(config, context) {
   return config;
-}" aria-describedby="config-script-help"></textarea>
-            <p class="hint" id="config-script-help">基础 YAML 生成后执行，输入和返回值都是对象；DNS、TUN、Tailscale 等配置写在这里。</p>
+}"></textarea>
           </div>
+          <details class="script-help">
+            <summary>脚本说明</summary>
+            <div class="script-help-body">
+              <p><strong>原始订阅脚本</strong>：转换器取订阅或客户端刷新 provider 时执行，输入和返回值都是文本。</p>
+              <p><strong>规则预处理脚本</strong>：转换器获取 INI 时执行，输入和返回值都是文本；前置规则和代理组配置写在这里。</p>
+              <p><strong>后处理脚本</strong>：基础 YAML 生成后执行，输入和返回值都是对象；DNS、TUN、Tailscale 等配置写在这里。</p>
+            </div>
+          </details>
         </section>
 
         <section class="generate-section" aria-labelledby="generate-heading">
           <h2 id="generate-heading">保存与复制</h2>
-          <p class="section-description">新建会生成独立链接；更新会保存到已载入的原链接。切换到“新建订阅”可将当前配置另存为新链接。</p>
+          <p class="mode-badge" id="save-mode-badge" role="status">
+            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.2 11.8 11.8 8.2M7.4 6.1l1.1-1.1a3.4 3.4 0 0 1 4.8 4.8l-1.1 1.1M12.6 13.9l-1.1 1.1a3.4 3.4 0 0 1-4.8-4.8l1.1-1.1"/></svg>
+            <span id="save-mode-text">将创建独立链接</span>
+          </p>
           <div class="actions">
-            <button class="primary-button" id="generate-button" type="submit">生成订阅地址</button>
+            <button class="primary-button" id="generate-button" type="submit">
+              <span class="button-spinner" aria-hidden="true"></span>
+              <span class="button-label">生成订阅地址</span>
+            </button>
           </div>
           <p class="status" id="status" role="status" aria-live="polite" hidden></p>
-          <div id="result" hidden>
-            <div class="field">
-              <label for="result-url">生成的订阅地址</label>
-              <textarea class="code" id="result-url" rows="4" readonly spellcheck="false" aria-describedby="result-help"></textarea>
-              <p class="hint" id="result-help">复制后粘贴到 Clash / Mihomo 客户端的订阅设置中。</p>
+          <div id="result" class="result-card" hidden>
+            <div class="result-heading" role="status" aria-live="polite">
+              <span class="result-check" aria-hidden="true">
+                <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 10.5 3.2 3.2L15 6.9"/></svg>
+              </span>
+              <div>
+                <p class="result-title" id="result-title">订阅地址已生成</p>
+                <p class="result-subtitle" id="result-subtitle">复制到 Clash / Mihomo 客户端使用，或下载当前配置。</p>
+              </div>
             </div>
-            <div class="actions">
-              <button class="primary-button" id="copy-button" type="button">复制订阅地址</button>
-              <button class="secondary-button" id="download-button" type="button">下载配置</button>
+            <div class="result-link-row">
+              <label class="visually-hidden" for="result-url">生成的订阅地址</label>
+              <input class="code" id="result-url" type="text" readonly spellcheck="false">
+              <button class="primary-button" id="copy-button" type="button">
+                <span class="copy-label">复制链接</span>
+                <span class="copy-done" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 10.5 3.2 3.2L15 6.9"/></svg>
+                  已复制
+                </span>
+              </button>
             </div>
+            <div class="result-actions">
+              <button class="secondary-button" id="qr-button" type="button">二维码</button>
+              <button class="secondary-button" id="download-button" type="button">
+                <span class="button-spinner" aria-hidden="true"></span>
+                <span class="download-label">下载配置</span>
+                <span class="download-done" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 10.5 3.2 3.2L15 6.9"/></svg>
+                  已下载
+                </span>
+              </button>
+            </div>
+            <p class="result-feedback" id="result-feedback" role="status" aria-live="polite" hidden></p>
             <p class="hint privacy-note">持有链接的人可以获取订阅配置，请勿公开分享。页面刷新后，已生成的链接仍可使用。</p>
           </div>
         </section>
       </form>
     </main>
+
+    <div class="mobile-action-bar" id="mobile-action-bar" hidden>
+      <button class="primary-button" id="mobile-generate-button" type="submit" form="subscription-form">
+        <span class="button-spinner" aria-hidden="true"></span>
+        <span class="button-label">生成订阅地址</span>
+      </button>
+    </div>
 
     <dialog id="help-dialog" aria-labelledby="help-heading">
       <h2 id="help-heading">使用说明</h2>
@@ -255,9 +332,17 @@
         <li>新建时点击“生成订阅地址”；编辑已有订阅时粘贴短链接并载入，修改后点击“保存到原链接”。</li>
       </ol>
       <p>页面输入刷新后清空，可凭原链接和管理 token 重新载入。更新保存成功后，客户端下次更新整份订阅即可获取新配置。另存为新链接不会修改原订阅。请妥善保管订阅地址。</p>
+      <p>设置管理 token 后，生成、载入和更新配置时需要填写；客户端访问订阅无需 token。转换器必须能从公网访问，并会获得订阅内容，请选择可信服务。</p>
       <p>脚本需定义同步 transform(input, context)，没有网络、文件系统、Node.js 或 npm，不支持 async。后端生成链接时检查语法，使用链接时才执行脚本和公网地址检查。</p>
       <p>三个脚本合计最多 64 KiB，链接长度不会随脚本增长。生成成功不代表上游可访问或脚本执行成功。</p>
       <form method="dialog"><button class="primary-button">知道了</button></form>
+    </dialog>
+    <dialog id="qr-dialog" aria-labelledby="qr-heading">
+      <h2 id="qr-heading">订阅二维码</h2>
+      <p class="section-description">使用 Clash / Mihomo 客户端扫码导入当前订阅。</p>
+      <div id="qr-code" class="qr-code"></div>
+      <p class="hint privacy-note">二维码包含订阅链接，请勿公开分享。</p>
+      <form method="dialog"><button class="primary-button">关闭</button></form>
     </dialog>
   </body>
 </html>

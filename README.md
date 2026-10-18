@@ -162,7 +162,7 @@ Linux 可执行文件在 Debian 11 环境构建，要求 glibc 2.31 或更新版
 
 ## 单容器部署
 
-程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 `linux/amd64`、`linux/arm64`。当前版本为 `0.4.0`。需要从源码构建时使用：
+程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 `linux/amd64`、`linux/arm64`。当前版本为 `0.5.0`。需要从源码构建时使用：
 
 ```bash
 docker compose -f compose.yml -f compose.dev.yml up -d --build --wait

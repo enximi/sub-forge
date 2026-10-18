@@ -1,6 +1,6 @@
 services:
   sub-forge:
-    image: ghcr.io/enximi/sub-forge:v0.4.0
+    image: ghcr.io/enximi/sub-forge:v0.5.0
     restart: unless-stopped
     ports:
       - "127.0.0.1:8002:8080"
