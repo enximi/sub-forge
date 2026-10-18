@@ -72,7 +72,8 @@ a { color: inherit; }
 .brand { font-size: 23px; font-weight: 650; text-decoration: none; letter-spacing: -.7px; }
 .site-actions { display: flex; align-items: center; gap: 18px; }
 .version { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.repo-link { color: var(--muted); font-size: 14px; text-decoration: none; white-space: nowrap; }
+.repo-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; text-decoration: none; white-space: nowrap; }
+.repo-icon { width: 16px; height: 16px; flex: none; }
 .repo-short { display: none; }
 .repo-link:hover { color: var(--text); text-decoration: underline; }
 main { width: min(100%, 904px); margin: 0 auto; padding: 42px 32px 64px; }
@@ -163,12 +164,12 @@ dialog li + li { margin-top: 8px; }
 dialog form { margin-top: 24px; text-align: right; }
 @media (max-width: 600px) {
   .site-header { padding: 12px 20px; }
-  .site-actions { gap: 8px; }
+  .site-actions { gap: 6px; }
   .version { font-size: 12px; }
-  .repo-link { font-size: 13px; }
+  .repo-link { gap: 4px; font-size: 12px; }
   .repo-full { display: none; }
   .repo-short { display: inline; }
-  .text-button { padding: 8px 10px; min-height: 36px; font-size: 13px; }
+  .text-button { padding: 8px 8px; min-height: 36px; font-size: 13px; }
   main { padding: 28px 20px 40px; }
   h1 { font-size: 25px; }
   .page-heading { margin-bottom: 32px; }
