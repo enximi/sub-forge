@@ -9,7 +9,7 @@ use crate::{
     converter::{ConversionRequest, Converter},
     error::AppError,
     links::{EditableSubscription, Links, SavedLink},
-    model::{LinkKind, SourceConfig, StoredLink, SubscriptionConfig},
+    model::{DEFAULT_FILENAME, LinkKind, SourceConfig, StoredLink, SubscriptionConfig},
     network::PublicNetwork,
     pipeline::ConfigPipeline,
     rules::{RuleSource, template_marker},
@@ -20,6 +20,12 @@ use crate::{
 pub struct SubscriptionContent {
     pub body: Vec<u8>,
     pub userinfo: Option<HeaderValue>,
+    pub filename: String,
+}
+
+pub struct GeneratedConfig {
+    pub body: Vec<u8>,
+    pub filename: String,
 }
 
 pub struct SubscriptionService {
@@ -79,17 +85,19 @@ impl SubscriptionService {
         self.links.update_subscription(id, config).await
     }
 
-    pub async fn generate(&self, id: &str) -> Result<Vec<u8>, AppError> {
+    pub async fn generate(&self, id: &str) -> Result<GeneratedConfig, AppError> {
         let _permit = self.conversions.try_acquire().map_err(|_| AppError::Busy)?;
         tokio::time::timeout(self.timeout, async {
             let config = self.links.feed(id).await?;
+            let filename = download_filename(&config.filename);
             let request = self.conversion_request(&config).await?;
-            self.pipeline.generate(
+            let body = self.pipeline.generate(
                 &config.scripts.postprocess_config,
                 &self.scripts,
                 script_context(json!({"subscription": request.subscription_url.as_str(), "rules": request.rules_url.as_str()})),
                 &request,
-            ).await
+            ).await?;
+            Ok(GeneratedConfig { body, filename })
         }).await.map_err(|_| AppError::Busy)?
     }
 
@@ -111,6 +119,7 @@ impl SubscriptionService {
         Ok(SubscriptionContent {
             body,
             userinfo: headers.get("subscription-userinfo").cloned(),
+            filename: download_filename(&config.filename),
         })
     }
 
@@ -148,6 +157,7 @@ impl SubscriptionService {
             .save(StoredLink::Subscription(SourceConfig {
                 source_url: config.source_url.clone(),
                 script: config.scripts.subscription.clone(),
+                filename: download_filename(&config.filename),
             }))
             .await?;
         let rules = self
@@ -155,6 +165,7 @@ impl SubscriptionService {
             .save(StoredLink::Rules(SourceConfig {
                 source_url: config.policy.rules.source_url.clone(),
                 script: config.scripts.preprocess_rules.clone(),
+                filename: String::new(),
             }))
             .await?;
         Ok(ConversionRequest {
@@ -163,7 +174,16 @@ impl SubscriptionService {
             subscription_url: self.links.url(LinkKind::Subscription, &subscription.id),
             rules_url: self.links.url(LinkKind::Rules, &rules.id),
             rules_marker: template_marker(&rules.id),
+            filename: download_filename(&config.filename),
         })
+    }
+}
+
+fn download_filename(value: &str) -> String {
+    if value.is_empty() {
+        DEFAULT_FILENAME.to_owned()
+    } else {
+        value.to_owned()
     }
 }
 

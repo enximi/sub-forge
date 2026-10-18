@@ -16,6 +16,7 @@ pub struct ConversionRequest {
     pub subscription_url: Url,
     pub rules_url: Url,
     pub rules_marker: String,
+    pub filename: String,
 }
 
 #[derive(Clone)]
@@ -35,6 +36,7 @@ impl Converter {
         subscription_url: &Url,
         rules_url: &Url,
         options: &ConverterOptions,
+        filename: &str,
     ) -> Url {
         let mut url = url.clone();
         // 转换器按 URL 缓存规则文件，每次生成使用不同地址以读取最新脚本与策略。
@@ -70,7 +72,7 @@ impl Converter {
             pairs.append_pair("target", "clash");
             pairs.append_pair("url", subscription_url.as_str());
             pairs.append_pair("config", rules_url.as_str());
-            pairs.append_pair("filename", "sub-forge");
+            pairs.append_pair("filename", filename);
             pairs.append_pair("list", "false");
             for (key, value) in [
                 ("insert", false),
@@ -95,8 +97,34 @@ impl Converter {
             &request.subscription_url,
             &request.rules_url,
             &request.options,
+            &request.filename,
         );
         let response = self.network.get(url).await?;
         read_limited_response(response, self.max_bytes).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, time::Duration};
+
+    use super::*;
+
+    #[test]
+    fn custom_filename_replaces_converter_default() {
+        let converter = Converter::new(PublicNetwork::new(Duration::from_secs(1)), 1024);
+        let url = Url::parse("https://converter.example.com/sub?token=abc&filename=old").unwrap();
+        let subscription = Url::parse("https://sub.example.com/api/v1/subscription/abc").unwrap();
+        let rules = Url::parse("https://sub.example.com/api/v1/rules/def").unwrap();
+        let output = converter.request_url(
+            &url,
+            &subscription,
+            &rules,
+            &ConverterOptions::default(),
+            "我的 订阅",
+        );
+        let pairs: HashMap<_, _> = output.query_pairs().into_owned().collect();
+        assert_eq!(pairs.get("filename").map(String::as_str), Some("我的 订阅"));
+        assert_eq!(pairs.get("token").map(String::as_str), Some("abc"));
     }
 }

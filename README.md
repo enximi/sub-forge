@@ -76,7 +76,7 @@ SubscriptionService：创建、转换、订阅与规则取源
 
 ## 公开或私有部署
 
-`SUB_FORGE_ACCESS_TOKEN` 用于控制订阅管理权限。设置后，生成、载入和更新接口都需要 `Authorization: Bearer <管理 token>`；缺失、错误或重复 Authorization 请求头返回 401，不接受 URL 查询参数传递凭据。前端在“管理 token”中填写同一值。配置留空时允许公开生成、载入和更新。
+`SUB_FORGE_ACCESS_TOKEN` 用于控制订阅管理权限。设置后，生成、载入和更新接口都需要 `Authorization: Bearer <管理 token>`；缺失、错误或重复 Authorization 请求头返回 401，不接受 URL 查询参数传递凭据。前端仅在设置 token 时显示“管理 token”输入框，填写同一值即可。配置留空时允许公开生成、载入和更新，页面不显示该输入框。
 
 token 须为 32 至 256 个可打印 ASCII 字符，不含空白，可用 `openssl rand -hex 32` 生成。不要将真实 token 提交到仓库或写入静态前端。Docker 在服务器私有 Compose 的 `environment` 中设置，直接运行在环境变量或 `.env` 中设置。
 
@@ -109,6 +109,8 @@ SQLite 自动升级时保留已有 ID 和创建时间。旧版曾合并为同一
 | `converter.interval_secs` | 刷新间隔整数 | 86400 秒，范围 60–604800 |
 
 刷新间隔传递给转换器，并应用到本次订阅对应的 HTTP provider；用户后处理脚本仍可覆盖它。本站不会保存任务或定时刷新。
+
+顶层 `filename` 可选，用于客户端下载名和转换器 `filename` 参数。只填写不含扩展名的单段名称，默认 `sub-forge`；下载配置为 `<filename>.yaml`，原始订阅为 `<filename>.txt`。名称最长 64 个字符，不能包含路径分隔符、控制字符或 `: * ? " < > |`。
 
 | 脚本 | 输入与返回值 | 执行时机 |
 | --- | --- | --- |
@@ -144,7 +146,7 @@ YAML 经对象解析后重新序列化，注释、锚点写法和排版不会保
 
 ## 单容器部署
 
-程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 AMD64 / ARM64。当前版本为 `0.2.0`。需要从源码构建时使用：
+程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 AMD64 / ARM64。当前版本为 `0.3.0`。需要从源码构建时使用：
 
 ```bash
 docker compose -f compose.yml -f compose.dev.yml up -d --build --wait

@@ -12,6 +12,18 @@ const existingUrl = document.querySelector("#existing-url");
 const loadButton = document.querySelector("#load-button");
 const updatePanel = document.querySelector("#update-panel");
 const editingNote = document.querySelector("#editing-note");
+const accessTokenField = document.querySelector("#access-token-field");
+const accessTokenInput = form.elements.access_token;
+const accessTokenRequired = form.dataset.accessTokenRequired === "true";
+
+if (accessTokenRequired) {
+  accessTokenInput.required = true;
+} else {
+  // 公开部署不需要 token：隐藏并禁用字段，避免被自动填充或误提交。
+  accessTokenField.hidden = true;
+  accessTokenInput.disabled = true;
+}
+
 let editingSubscription;
 let revision = 0;
 let generatedSubscription;
@@ -73,6 +85,11 @@ loadButton.addEventListener("click", async () => {
     existingUrl.focus();
     return;
   }
+  if (accessTokenRequired && !accessTokenInput.value.trim()) {
+    showStatus("请填写管理 token。", true);
+    accessTokenInput.focus();
+    return;
+  }
   invalidate({ target: existingUrl });
   const current = revision;
   const controller = new AbortController();
@@ -81,13 +98,14 @@ loadButton.addEventListener("click", async () => {
   loadButton.textContent = "正在载入…";
   generateButton.disabled = true;
   form.setAttribute("aria-busy", "true");
-  showStatus("正在验证 token 并载入配置…");
+  showStatus(accessTokenRequired ? "正在验证 token 并载入配置…" : "正在载入配置…");
   try {
-    const output = await loadSubscription(form.elements.access_token.value, existingUrl.value, controller.signal);
+    const output = await loadSubscription(accessTokenInput.value, existingUrl.value, controller.signal);
     if (current !== revision) return;
     const config = output.config;
     form.elements.source.value = config.source_url;
     form.elements.converter.value = config.converter_url;
+    form.elements.filename.value = config.filename || "";
     rulesPicker.setUrl(config.policy.rules.source_url);
     for (const name of ["emoji", "tfo", "scv", "fdn", "expand", "sort", "new_name"]) {
       form.elements[name].checked = config.policy.converter[name];
@@ -128,6 +146,7 @@ function readForm() {
     config: {
       source_url: data.get("source"),
       converter_url: data.get("converter"),
+      filename: data.get("filename"),
       policy: {
         rules: { source_url: rulesPicker.getUrl() },
         converter: {
@@ -223,12 +242,12 @@ downloadButton.addEventListener("click", async () => {
   downloadButton.textContent = "正在转换…";
   showStatus("正在从后端获取最新订阅并转换配置…");
   try {
-    const blob = await downloadConfiguration(generatedSubscription.id, controller.signal);
+    const download = await downloadConfiguration(generatedSubscription.id, controller.signal);
     if (current !== revision) return;
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(download.blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "sub-forge.yaml";
+    link.download = download.filename || "sub-forge.yaml";
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     showStatus("配置已下载，可导入 Clash / Mihomo 客户端使用。");

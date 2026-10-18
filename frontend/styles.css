@@ -80,6 +80,10 @@ section + section { margin-top: 36px; padding-top: 32px; border-top: 1px solid v
 .section-description { margin: -12px 0 24px; }
 .field + .field { margin-top: 24px; }
 .field > label { display: block; font-size: 14px; font-weight: 550; margin-bottom: 8px; }
+/* 公开部署不渲染管理 token 输入框，避免脚本加载前闪现。 */
+form[data-access-token-required="false"] #access-token-field { display: none; }
+form[data-access-token-required="false"] .management-switch { margin-bottom: 0; }
+
 input:not([type="checkbox"]):not([type="radio"]), textarea, select {
   width: 100%;
   min-width: 0;

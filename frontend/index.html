@@ -23,17 +23,17 @@
       </div>
       <noscript><p class="status error">请启用 JavaScript，以便提交参数并生成订阅链接。</p></noscript>
 
-      <form id="subscription-form" autocomplete="off">
+      <form id="subscription-form" autocomplete="off" data-access-token-required="__ACCESS_TOKEN_REQUIRED__">
         <section aria-labelledby="manage-heading">
           <h2 id="manage-heading" class="visually-hidden">订阅管理</h2>
           <div class="segmented-control management-switch" role="radiogroup" aria-labelledby="manage-heading">
             <label><input type="radio" name="subscription_mode" value="create" checked><span>新建订阅</span></label>
             <label><input type="radio" name="subscription_mode" value="update"><span>更新订阅</span></label>
           </div>
-          <div class="field">
-            <label for="access-token">管理 token（按部署要求填写）</label>
-            <input id="access-token" name="access_token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="256" placeholder="公开服务留空" aria-describedby="access-token-help">
-            <p class="hint" id="access-token-help">生成、载入和更新配置时验证，访问订阅无需 token。</p>
+          <div class="field" id="access-token-field">
+            <label for="access-token">管理 token</label>
+            <input id="access-token" name="access_token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="256" placeholder="填写部署时设置的管理 token" aria-describedby="access-token-help">
+            <p class="hint" id="access-token-help">此部署已启用管理鉴权，生成、载入和更新配置时需要填写；访问订阅无需 token。</p>
           </div>
           <div id="update-panel" hidden>
             <div class="field">
@@ -51,6 +51,11 @@
             <label for="source-url">订阅链接</label>
             <textarea id="source-url" name="source" rows="3" required spellcheck="false" placeholder="https://example.com/subscribe" aria-describedby="source-help"></textarea>
             <p class="hint" id="source-help">支持普通订阅和 Sub-Store 聚合链接。</p>
+          </div>
+          <div class="field">
+            <label for="filename">配置文件名称 <span class="optional">可选</span></label>
+            <input id="filename" name="filename" type="text" maxlength="64" spellcheck="false" placeholder="sub-forge" aria-describedby="filename-help">
+            <p class="hint" id="filename-help">不含扩展名，留空使用 sub-forge。下载配置为“名称.yaml”，原始订阅为“名称.txt”。</p>
           </div>
           <fieldset class="field rules-fieldset">
             <legend>规则模板</legend>
@@ -237,7 +242,7 @@
     <dialog id="help-dialog" aria-labelledby="help-heading">
       <h2 id="help-heading">使用说明</h2>
       <ol>
-        <li>填写订阅、规则模板和转换器地址。</li>
+        <li>填写订阅、规则模板和转换器地址，按需设置配置文件名称。</li>
         <li>调整转换选项，按需填写三个处理脚本。</li>
         <li>新建时点击“生成订阅地址”；编辑已有订阅时粘贴短链接并载入，修改后点击“保存到原链接”。</li>
       </ol>

@@ -67,6 +67,23 @@ export function updateSubscription(id, accessToken, config, signal) {
   return subscriptionRequest(`subscriptions/${id}`, "PUT", accessToken, config, signal);
 }
 
+function dispositionFilename(disposition) {
+  // 服务端优先提供 RFC 5987 编码名，可正确还原中文和空格。
+  const encoded = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(disposition);
+  if (encoded) {
+    try { return decodeURIComponent(encoded[1].trim()); } catch {
+      // 编码异常时退回 ASCII 文件名。
+    }
+  }
+  const quoted = /filename\s*=\s*"([^"]*)"/i.exec(disposition);
+  if (quoted) return quoted[1];
+  const plain = /filename\s*=\s*([^;]+)/i.exec(disposition);
+  return plain ? plain[1].trim() : "";
+}
+
 export function downloadConfiguration(id, signal) {
-  return request(endpoint(`clash/${id}`), {}, signal, 70000, response => response.blob());
+  return request(endpoint(`clash/${id}`), {}, signal, 70000, async response => {
+    const disposition = response.headers.get("content-disposition") || "";
+    return { blob: await response.blob(), filename: dispositionFilename(disposition) };
+  });
 }

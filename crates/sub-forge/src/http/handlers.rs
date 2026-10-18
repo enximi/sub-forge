@@ -7,7 +7,7 @@ use axum::{
     response::IntoResponse,
 };
 
-use super::HttpState;
+use super::{HttpState, response::attachment};
 use crate::{error::AppError, model::SubscriptionConfig};
 use serde::Deserialize;
 
@@ -53,16 +53,17 @@ pub(super) async fn clash(
     State(state): State<Arc<HttpState>>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    Ok((
-        [
-            (header::CONTENT_TYPE, "application/yaml; charset=utf-8"),
-            (
-                header::CONTENT_DISPOSITION,
-                "attachment; filename=\"sub-forge.yaml\"",
-            ),
-        ],
-        state.service.generate(&id).await?,
-    ))
+    let generated = state.service.generate(&id).await?;
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/yaml; charset=utf-8"),
+    );
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        attachment(&generated.filename, "yaml"),
+    );
+    Ok((headers, generated.body))
 }
 
 pub(super) async fn subscription(
@@ -77,7 +78,7 @@ pub(super) async fn subscription(
     );
     headers.insert(
         header::CONTENT_DISPOSITION,
-        HeaderValue::from_static("attachment; filename=\"subscription.txt\""),
+        attachment(&content.filename, "txt"),
     );
     // 只转发订阅用量信息，不透传上游的内容类型或其他响应头。
     if let Some(userinfo) = content.userinfo {

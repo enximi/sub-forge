@@ -50,6 +50,7 @@ curl --fail-with-body https://sub.example.com/api/v1/subscriptions \
   -d '{
     "source_url": "https://provider.example.com/subscribe?token=your-token",
     "converter_url": "https://converter.example.com/sub",
+    "filename": "my-sub",
     "policy": {
       "rules": { "source_url": "https://example.com/rules.ini" },
       "converter": { "emoji": true, "interval_secs": 86400 }
@@ -64,7 +65,7 @@ curl --fail-with-body https://sub.example.com/api/v1/subscriptions \
 
 启用生成鉴权时添加 `Authorization: Bearer <管理 token>`。返回的订阅 URL 及后续回调仅包含随机 ID，访问时无需 token。
 
-`source_url`、`converter_url` 和 `policy.rules.source_url` 必填。`policy.converter` 可省略，选项为 `emoji=true`、`tfo=false`、`scv=false`、`fdn=false`、`expand=true`、`sort=false`、`new_name=true`、`interval_secs=86400`；刷新间隔范围 60–604800 秒。`scripts` 和其中各阶段可省略，默认空字符串。未知字段会被拒绝。
+`source_url`、`converter_url` 和 `policy.rules.source_url` 必填。`policy.converter` 可省略，选项为 `emoji=true`、`tfo=false`、`scv=false`、`fdn=false`、`expand=true`、`sort=false`、`new_name=true`、`interval_secs=86400`；刷新间隔范围 60–604800 秒。`scripts` 和其中各阶段可省略，默认空字符串。`filename` 可省略，默认 `sub-forge`，用于 `/clash` 和 `/subscription` 的 `Content-Disposition` 及转换器 `filename` 参数；只填写不含扩展名的单段名称，最多 64 个字符，不能包含路径分隔符、控制字符或 `: * ? " < > |`，配置下载为 `<filename>.yaml`，原始订阅为 `<filename>.txt`。中文名称会同时输出 ASCII 回退名和 RFC 5987 `filename*=UTF-8''...`。未知字段会被拒绝。
 
 生成时校验 URL 格式、选项、脚本长度和 QuickJS 语法，不抓取上游或执行用户代码。脚本按原文保存，保留注释和排版。三个脚本合计最多 64 KiB，JSON 请求体最多 512 KiB，每个 URL 最多 2048 字节；超过请求体限制也返回 JSON 错误。生成成功不代表上游可用、`transform` 入口有效或实际转换成功。
 
@@ -153,7 +154,7 @@ function transform(config, context) {
 
 `SUB_FORGE_ACCESS_TOKEN` 未设置或为空时，允许公开生成、载入和更新。设置非空值后，生成、载入和更新接口均要求 `Authorization: Bearer <管理 token>`，鉴权成功后才校验和保存参数。缺失、错误、畸形或重复 Authorization 请求头返回 `401`、`WWW-Authenticate: Bearer realm="SubForge"` 及 `{"error":"管理 token 缺失或无效"}`。不接受 URL 查询参数传递生成凭据。
 
-token 须为 32 至 256 个无空白的可打印 ASCII 字符；无效的服务端配置会拒绝启动。建议用 `openssl rand -hex 32` 生成，不要提交真实值。前端在生成、载入和更新请求的 Bearer 头中提交 token，下载不携带凭据。
+token 须为 32 至 256 个无空白的可打印 ASCII 字符；无效的服务端配置会拒绝启动。建议用 `openssl rand -hex 32` 生成，不要提交真实值。前端根据服务端启动配置决定是否渲染“管理 token”输入框：未设置 token 时隐藏并禁用该字段，设置后才显示；生成、载入和更新请求的 Bearer 头中提交 token，下载不携带凭据。
 
 所有 GET 接口均无需管理 token，订阅、订阅源、规则模板、规则资源及 provider URL 仅包含随机 ID。持有链接即可读取对应内容，请妥善保管链接和配置。管理 token 不会写入数据库记录、链接或脚本上下文。网页、健康检查和 CORS 预检无需鉴权；IP 限流覆盖所有业务请求，包括鉴权失败的生成请求。
 

@@ -1,10 +1,58 @@
-use crate::error::AppError;
+use crate::{error::AppError, model::DEFAULT_FILENAME};
 use axum::{
     Json,
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
+
+/// 同时提供 ASCII 回退名和 RFC 5987 编码名，兼容下载器与中文文件名。
+pub fn attachment(base: &str, extension: &str) -> HeaderValue {
+    let full = format!("{base}.{extension}");
+    let fallback = ascii_fallback(&full);
+    let encoded = encode_rfc5987(&full);
+    let value = if encoded == fallback {
+        format!("attachment; filename=\"{fallback}\"")
+    } else {
+        format!("attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}")
+    };
+    HeaderValue::from_str(&value)
+        .unwrap_or_else(|_| HeaderValue::from_static("attachment; filename=\"sub-forge.yaml\""))
+}
+
+fn ascii_fallback(name: &str) -> String {
+    let fallback: String = name
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    match fallback.as_str() {
+        "" | "." | ".." => DEFAULT_FILENAME.to_owned(),
+        _ => fallback,
+    }
+}
+
+fn encode_rfc5987(name: &str) -> String {
+    let mut encoded = String::with_capacity(name.len());
+    for byte in name.bytes() {
+        if byte.is_ascii_alphanumeric()
+            || matches!(
+                byte,
+                b'!' | b'#' | b'$' | b'&' | b'+' | b'-' | b'.' | b'^' | b'_' | b'`' | b'|' | b'~'
+            )
+        {
+            encoded.push(byte as char);
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    encoded
+}
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         if let Self::UpstreamRequest(error) = &self {
@@ -53,4 +101,33 @@ impl IntoResponse for AppError {
 #[derive(Debug, Serialize)]
 struct ErrorBody {
     error: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::attachment;
+
+    #[test]
+    fn ascii_filename_uses_plain_disposition() {
+        assert_eq!(
+            attachment("sub-forge", "yaml"),
+            "attachment; filename=\"sub-forge.yaml\""
+        );
+    }
+
+    #[test]
+    fn unicode_filename_adds_rfc5987_form() {
+        let value = attachment("我的订阅", "yaml");
+        let value = value.to_str().unwrap();
+        assert!(value.contains("filename=\"____.yaml\""));
+        assert!(value.contains("filename*=UTF-8''%E6%88%91%E7%9A%84%E8%AE%A2%E9%98%85.yaml"));
+    }
+
+    #[test]
+    fn reserved_characters_are_encoded_and_sanitized() {
+        let value = attachment("my sub?#", "txt");
+        let value = value.to_str().unwrap();
+        assert!(value.contains("filename=\"my_sub__.txt\""));
+        assert!(value.contains("filename*=UTF-8''my%20sub%3F#.txt"));
+    }
 }
