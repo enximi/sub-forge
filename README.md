@@ -144,9 +144,26 @@ QuickJS 只提供 JavaScript 标准能力，没有文件系统、环境变量、
 
 YAML 经对象解析后重新序列化，注释、锚点写法和排版不会保留。程序检查最终顶层对象及大小，不替代 Mihomo 内核验证所有配置字段。转换器的管理员插入节点功能固定关闭。
 
+## 发布资产与平台
+
+每次 GitHub Release 同时发布容器镜像和独立可执行文件。在 [Releases](https://github.com/enximi/sub-forge/releases/latest) 下载对应平台的压缩包，包内包含程序、`README.md` 和 `LICENSE`：
+
+| 系统 | 架构 | Release 文件 |
+| --- | --- | --- |
+| Linux | x86_64 | `sub-forge-vX.Y.Z-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux | aarch64 | `sub-forge-vX.Y.Z-aarch64-unknown-linux-gnu.tar.gz` |
+| Linux | armv7 | `sub-forge-vX.Y.Z-armv7-unknown-linux-gnueabihf.tar.gz` |
+| macOS | Intel | `sub-forge-vX.Y.Z-x86_64-apple-darwin.tar.gz` |
+| macOS | Apple Silicon | `sub-forge-vX.Y.Z-aarch64-apple-darwin.tar.gz` |
+| Windows | x86_64 | `sub-forge-vX.Y.Z-x86_64-pc-windows-msvc.zip` |
+
+Linux 可执行文件在 Debian 11 环境构建，要求 glibc 2.31 或更新版本。macOS 包内的二进制已做 ad-hoc 签名；如果被 Gatekeeper 隔离，可执行 `xattr -d com.apple.quarantine sub-forge` 后运行。每个 Release 提供 `SHA256SUMS` 供下载后校验。
+
+容器镜像与 Linux 可执行文件覆盖完全相同的架构：`linux/amd64`、`linux/arm64`、`linux/arm/v7`。macOS 和 Windows 无法以容器形式发布，因此只提供独立可执行文件。
+
 ## 单容器部署
 
-程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 AMD64 / ARM64。当前版本为 `0.3.0`。需要从源码构建时使用：
+程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 `linux/amd64`、`linux/arm64` 和 `linux/arm/v7`。当前版本为 `0.4.0`。需要从源码构建时使用：
 
 ```bash
 docker compose -f compose.yml -f compose.dev.yml up -d --build --wait
@@ -239,8 +256,8 @@ cargo build --locked -p sub-forge
 
 1. 更新 Cargo workspace 版本及 Compose、文档中的镜像标签，并更新 `Cargo.lock`。
 2. 完成上述静态检查，提交后创建相同版本的 `v0.y.z` tag。
-3. 在 GitHub 发布对应 Release，自动触发 `Publish container image` 工作流。
-4. 等待 Rust / JavaScript 检查、AMD64 / ARM64 构建和多架构清单发布全部成功，再部署版本镜像。
+3. 在 GitHub 发布对应 Release，自动触发 `Publish container image` 和 `Publish release binaries` 两个工作流。
+4. 等待 Rust / JavaScript 检查、Linux / macOS / Windows 可执行文件与 `SHA256SUMS` 上传、多架构镜像清单发布全部成功，再部署版本镜像或分发可执行文件。
 
 工作流使用 GitHub 提供的 `GITHUB_TOKEN` 推送 GHCR，无需配置个人访问令牌。首次发布后，将容器包的可见性设为 Public，使服务器无需登录就能拉取；后续版本沿用包的可见性。也可在 Actions 中选择现有版本 tag 手动重跑。公开镜像附带源码地址、版本、提交 SHA、构建来源和 SBOM。
 

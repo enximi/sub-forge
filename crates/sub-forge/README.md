@@ -10,6 +10,10 @@
 
 程序使用一套环境变量配置：直接运行时通过 `.env` 设置，Docker 运行时通过 `compose.yml` 的 `environment` 设置同名配置。镜像、端口映射和重启策略直接在 Compose 中设置。
 
+### 发布文件与镜像
+
+[GitHub Releases](https://github.com/enximi/sub-forge/releases/latest) 提供 Linux `x86_64` / `aarch64` / `armv7`、macOS Intel / Apple Silicon 和 Windows `x86_64` 的独立可执行文件，以及 `SHA256SUMS`。Linux 文件要求 glibc 2.31 或更新版本。容器镜像 `ghcr.io/enximi/sub-forge` 覆盖与 Linux 可执行文件相同的三种架构；macOS 和 Windows 只提供独立可执行文件。
+
 ### Docker Compose
 
 在 `compose.yml` 的 `environment` 中，将 `SUB_FORGE_PUBLIC_BASE_URL` 改为用户和转换器可以访问的实际 API 地址，按需调整其他参数，然后启动；无需创建 `.env`：

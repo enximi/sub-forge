@@ -1,0 +1,178 @@
+name: Publish release binaries
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, for example v0.3.0
+        required: true
+        type: string
+
+concurrency:
+  group: publish-binaries-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  verify:
+    name: Validate release
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - name: Validate release version
+        run: |
+          python3 - <<'PYTHON'
+          import os, re, tomllib
+          tag = os.environ["TAG"]
+          assert re.fullmatch(r"v0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", tag), "请使用 v0.y.z 标签"
+          with open("Cargo.toml", "rb") as source:
+              version = tomllib.load(source)["workspace"]["package"]["version"]
+          assert tag == "v" + version, "Release tag and Cargo version must match"
+          PYTHON
+
+  linux:
+    name: Linux ${{ matrix.arch }}
+    needs: verify
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            target: x86_64-unknown-linux-gnu
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            target: aarch64-unknown-linux-gnu
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          - arch: armv7
+            target: armv7-unknown-linux-gnueabihf
+            platform: linux/arm/v7
+            runner: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - name: Set up QEMU
+        if: matrix.arch == 'armv7'
+        uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - name: Build release binary
+        run: |
+          docker buildx build \
+            --platform "${{ matrix.platform }}" \
+            --output type=local,dest=dist \
+            --cache-from type=gha,scope=release-${{ matrix.arch }} \
+            --cache-to type=gha,mode=max,scope=release-${{ matrix.arch }} \
+            -f Dockerfile.release .
+          test -x dist/sub-forge
+      - name: Package
+        run: |
+          mkdir -p package
+          cp dist/sub-forge package/
+          cp LICENSE README.md package/
+          chmod 755 package/sub-forge
+          tar --owner=0 --group=0 --numeric-owner -czf "sub-forge-${TAG}-${{ matrix.target }}.tar.gz" -C package .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.target }}
+          path: sub-forge-*.tar.gz
+          if-no-files-found: error
+
+  macos:
+    name: macOS ${{ matrix.arch }}
+    needs: verify
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            target: x86_64-apple-darwin
+            runner: macos-15-intel
+          - arch: arm64
+            target: aarch64-apple-darwin
+            runner: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - uses: dtolnay/rust-toolchain@1.97.0
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Build release binary
+        run: cargo build --release --locked --target "${{ matrix.target }}"
+      - name: Package
+        run: |
+          mkdir -p package
+          cp "target/${{ matrix.target }}/release/sub-forge" package/
+          cp LICENSE README.md package/
+          codesign --force --sign - package/sub-forge
+          chmod 755 package/sub-forge
+          tar -czf "sub-forge-${TAG}-${{ matrix.target }}.tar.gz" -C package .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.target }}
+          path: sub-forge-*.tar.gz
+          if-no-files-found: error
+
+  windows:
+    name: Windows x86_64
+    needs: verify
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - uses: dtolnay/rust-toolchain@1.97.0
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: x86_64-pc-windows-msvc
+      - name: Build release binary
+        run: cargo build --release --locked --target x86_64-pc-windows-msvc
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item "target/x86_64-pc-windows-msvc/release/sub-forge.exe" package/
+          Copy-Item LICENSE, README.md package/
+          Compress-Archive -Path package/* -DestinationPath "sub-forge-$env:TAG-x86_64-pc-windows-msvc.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-x86_64-pc-windows-msvc
+          path: sub-forge-*.zip
+          if-no-files-found: error
+
+  publish:
+    name: Upload release assets
+    needs: [linux, macos, windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+      - name: Upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload "$TAG" dist/* --clobber

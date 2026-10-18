@@ -12,6 +12,7 @@ const existingUrl = document.querySelector("#existing-url");
 const loadButton = document.querySelector("#load-button");
 const updatePanel = document.querySelector("#update-panel");
 const editingNote = document.querySelector("#editing-note");
+const loadError = document.querySelector("#load-error");
 const accessTokenField = document.querySelector("#access-token-field");
 const accessTokenInput = form.elements.access_token;
 const accessTokenRequired = form.dataset.accessTokenRequired === "true";
@@ -34,6 +35,17 @@ function showStatus(message, error = false) {
   status.textContent = message;
   status.classList.toggle("error", error);
   status.hidden = false;
+}
+
+function showLoadError(message) {
+  status.hidden = true;
+  loadError.textContent = message;
+  loadError.hidden = false;
+}
+
+function clearLoadError() {
+  loadError.textContent = "";
+  loadError.hidden = true;
 }
 
 function isUpdateMode() {
@@ -68,6 +80,7 @@ function invalidate(event) {
   resultUrl.value = "";
   generatedSubscription = undefined;
   status.hidden = true;
+  clearLoadError();
   event.target.setCustomValidity?.("");
   event.target.removeAttribute("aria-invalid");
 }
@@ -81,12 +94,12 @@ const rulesPicker = initRulesPicker(form, invalidate);
 loadButton.addEventListener("click", async () => {
   if (!isUpdateMode()) return;
   if (!existingUrl.value.trim() || !existingUrl.reportValidity()) {
-    showStatus("请先填写已有的 SubForge 订阅链接。", true);
+    showLoadError("请先填写已有的 SubForge 订阅链接。");
     existingUrl.focus();
     return;
   }
   if (accessTokenRequired && !accessTokenInput.value.trim()) {
-    showStatus("请填写管理 token。", true);
+    showLoadError("请填写管理 token。");
     accessTokenInput.focus();
     return;
   }
@@ -98,7 +111,6 @@ loadButton.addEventListener("click", async () => {
   loadButton.textContent = "正在载入…";
   generateButton.disabled = true;
   form.setAttribute("aria-busy", "true");
-  showStatus(accessTokenRequired ? "正在验证 token 并载入配置…" : "正在载入配置…");
   try {
     const output = await loadSubscription(accessTokenInput.value, existingUrl.value, controller.signal);
     if (current !== revision) return;
@@ -120,13 +132,11 @@ loadButton.addEventListener("click", async () => {
     }
     editingSubscription = { id: output.id, url: output.url };
     existingUrl.value = output.url;
+    clearLoadError();
     showStatus("配置已载入。修改后保存到原链接，客户端无需更换订阅地址。");
     scrollTo(document.querySelector("#subscription-heading"));
   } catch (error) {
-    if (current === revision) {
-      showStatus(error.message, true);
-      scrollTo(status);
-    }
+    if (current === revision) showLoadError(error.message);
   } finally {
     if (current === revision) stopGeneration();
   }

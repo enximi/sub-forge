@@ -3,6 +3,7 @@
 !Cargo.toml
 !Cargo.lock
 !Dockerfile
+!Dockerfile.release
 !crates/
 !crates/sub-forge/
 !crates/sub-forge/Cargo.toml

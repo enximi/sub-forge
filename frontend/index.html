@@ -10,10 +10,14 @@
     <link rel="stylesheet" href="./styles.css">
     <script type="module" src="./app.js"></script>
   </head>
-  <body>
+  <body data-1p-ignore data-op-ignore>
     <header class="site-header">
       <a class="brand" href="./" aria-label="SubForge 首页">SubForge</a>
-      <button class="text-button" id="help-button" type="button">使用说明</button>
+      <nav class="site-actions" aria-label="站点信息">
+        <span class="version" title="当前版本">v__SUB_FORGE_VERSION__</span>
+        <a class="repo-link" href="__SUB_FORGE_REPOSITORY__" title="__SUB_FORGE_REPOSITORY__" target="_blank" rel="noopener noreferrer"><span class="repo-full">__SUB_FORGE_REPOSITORY_DISPLAY__</span><span class="repo-short">__SUB_FORGE_REPOSITORY_PATH__</span> ↗</a>
+        <button class="text-button" id="help-button" type="button">使用说明</button>
+      </nav>
     </header>
 
     <main>
@@ -23,7 +27,7 @@
       </div>
       <noscript><p class="status error">请启用 JavaScript，以便提交参数并生成订阅链接。</p></noscript>
 
-      <form id="subscription-form" autocomplete="off" data-access-token-required="__ACCESS_TOKEN_REQUIRED__">
+      <form id="subscription-form" autocomplete="off" data-form-type="other" data-access-token-required="__ACCESS_TOKEN_REQUIRED__">
         <section aria-labelledby="manage-heading">
           <h2 id="manage-heading" class="visually-hidden">订阅管理</h2>
           <div class="segmented-control management-switch" role="radiogroup" aria-labelledby="manage-heading">
@@ -32,7 +36,7 @@
           </div>
           <div class="field" id="access-token-field">
             <label for="access-token">管理 token</label>
-            <input id="access-token" name="access_token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="256" placeholder="填写部署时设置的管理 token" aria-describedby="access-token-help">
+            <input id="access-token" name="access_token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="256" placeholder="填写部署时设置的管理 token" aria-describedby="access-token-help" data-1p-ignore data-op-ignore data-bwignore data-lpignore="true">
             <p class="hint" id="access-token-help">此部署已启用管理鉴权，生成、载入和更新配置时需要填写；访问订阅无需 token。</p>
           </div>
           <div id="update-panel" hidden>
@@ -42,6 +46,7 @@
               <p class="hint" id="existing-help">填写链接后载入配置，修改脚本或参数即可保存到原链接。</p>
             </div>
             <button id="load-button" class="secondary-button" type="button">载入配置</button>
+            <p id="load-error" class="status error inline-error" role="alert" hidden></p>
             <p id="editing-note" class="hint" role="status" hidden>正在编辑已有订阅，保存后链接不变。客户端下次更新整份订阅时生效。</p>
           </div>
         </section>

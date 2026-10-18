@@ -1,0 +1,13 @@
+FROM rust:1.97-bullseye AS builder
+
+WORKDIR /app
+
+COPY Cargo.toml Cargo.lock ./
+COPY crates/sub-forge/Cargo.toml ./crates/sub-forge/Cargo.toml
+COPY crates/sub-forge/src ./crates/sub-forge/src
+COPY frontend ./frontend
+RUN cargo build --release --locked --package sub-forge
+
+FROM scratch
+
+COPY --from=builder /app/target/release/sub-forge /sub-forge

@@ -70,6 +70,11 @@ a { color: inherit; }
   border-bottom: 1px solid var(--border);
 }
 .brand { font-size: 23px; font-weight: 650; text-decoration: none; letter-spacing: -.7px; }
+.site-actions { display: flex; align-items: center; gap: 18px; }
+.version { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.repo-link { color: var(--muted); font-size: 14px; text-decoration: none; white-space: nowrap; }
+.repo-short { display: none; }
+.repo-link:hover { color: var(--text); text-decoration: underline; }
 main { width: min(100%, 904px); margin: 0 auto; padding: 42px 32px 64px; }
 h1 { font-size: 28px; letter-spacing: -.6px; line-height: 1.4; margin: 0 0 10px; font-weight: 650; }
 h2 { font-size: 18px; line-height: 1.5; margin: 0 0 24px; font-weight: 650; }
@@ -144,6 +149,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px;
 textarea:focus-visible, select:focus-visible { outline: none; }
 .status { padding: 14px 16px; border-radius: 8px; background: var(--surface-muted); color: var(--text); margin-top: 20px; font-size: 14px; overflow-wrap: anywhere; }
 .status.error { color: var(--error); background: var(--error-background); }
+.inline-error { margin-top: 12px; padding: 10px 12px; font-size: 13px; }
 #result { margin-top: 24px; }
 #result-url { overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
@@ -157,6 +163,12 @@ dialog li + li { margin-top: 8px; }
 dialog form { margin-top: 24px; text-align: right; }
 @media (max-width: 600px) {
   .site-header { padding: 12px 20px; }
+  .site-actions { gap: 8px; }
+  .version { font-size: 12px; }
+  .repo-link { font-size: 13px; }
+  .repo-full { display: none; }
+  .repo-short { display: inline; }
+  .text-button { padding: 8px 10px; min-height: 36px; font-size: 13px; }
   main { padding: 28px 20px 40px; }
   h1 { font-size: 25px; }
   .page-heading { margin-bottom: 32px; }
@@ -168,6 +180,10 @@ dialog form { margin-top: 24px; text-align: right; }
   .rules-preset-meta { flex-direction: column; gap: 4px; }
   textarea.code { font-size: 16px; }
   .actions > button { flex: 1 1 auto; }
+}
+@media (max-width: 360px) {
+  .site-header { flex-wrap: wrap; row-gap: 4px; }
+  .site-actions { width: 100%; justify-content: space-between; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }

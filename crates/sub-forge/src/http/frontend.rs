@@ -43,14 +43,27 @@ async fn index(State(state): State<Arc<HttpState>>) -> impl IntoResponse {
 }
 
 fn page(access_token_required: bool) -> String {
-    PAGE.replace(
-        "__ACCESS_TOKEN_REQUIRED__",
-        if access_token_required {
-            "true"
-        } else {
-            "false"
-        },
-    )
+    let repository = env!("CARGO_PKG_REPOSITORY");
+    let repository_display = repository
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .trim_end_matches('/');
+    let repository_path = repository_display
+        .split_once('/')
+        .map(|(_, path)| path.trim_end_matches(".git"))
+        .unwrap_or(repository_display);
+    PAGE.replace("__SUB_FORGE_VERSION__", env!("CARGO_PKG_VERSION"))
+        .replace("__SUB_FORGE_REPOSITORY__", repository)
+        .replace("__SUB_FORGE_REPOSITORY_DISPLAY__", repository_display)
+        .replace("__SUB_FORGE_REPOSITORY_PATH__", repository_path)
+        .replace(
+            "__ACCESS_TOKEN_REQUIRED__",
+            if access_token_required {
+                "true"
+            } else {
+                "false"
+            },
+        )
 }
 
 async fn javascript(source: &'static str) -> impl IntoResponse {
@@ -69,5 +82,17 @@ mod tests {
         assert!(page(true).contains("data-access-token-required=\"true\""));
         assert!(page(false).contains("data-access-token-required=\"false\""));
         assert!(!page(false).contains("__ACCESS_TOKEN_REQUIRED__"));
+    }
+
+    #[test]
+    fn page_injects_version_and_repository() {
+        let page = page(false);
+        assert!(page.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
+        assert!(page.contains(env!("CARGO_PKG_REPOSITORY")));
+        assert!(!page.contains("__SUB_FORGE_VERSION__"));
+        assert!(!page.contains("__SUB_FORGE_REPOSITORY__"));
+        assert!(!page.contains("__SUB_FORGE_REPOSITORY_DISPLAY__"));
+        assert!(!page.contains("__SUB_FORGE_REPOSITORY_PATH__"));
+        assert!(page.contains("data-1p-ignore"));
     }
 }
