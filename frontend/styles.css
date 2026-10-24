@@ -151,9 +151,12 @@ input:not([type="checkbox"]):not([type="radio"])[aria-invalid="true"], textarea[
 .rules-favorite[aria-pressed="true"] { color: var(--accent); }
 .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; }
 .checkbox-grid label { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 14px; cursor: pointer; }
+.provider-option { grid-column: 1 / -1; margin-bottom: 8px; }
+.provider-option p { margin: 2px 0 0 28px; color: var(--muted); font-size: 13px; line-height: 1.6; }
 input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; flex: 0 0 auto; }
 .interval-field { margin-top: 24px; }
-.interval-presets { display: flex; flex-wrap: wrap; }
+.interval-presets { width: fit-content; max-width: 100%; flex-wrap: wrap; }
+.interval-presets span { white-space: nowrap; }
 .interval-custom { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .interval-custom input { max-width: 180px; }
 .interval-unit { color: var(--muted); font-size: 13px; }
