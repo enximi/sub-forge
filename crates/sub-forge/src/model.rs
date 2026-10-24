@@ -31,6 +31,7 @@ impl Policy {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConverterOptions {
+    pub provider: bool,
     pub emoji: bool,
     pub tfo: bool,
     pub scv: bool,
@@ -44,6 +45,7 @@ pub struct ConverterOptions {
 impl Default for ConverterOptions {
     fn default() -> Self {
         Self {
+            provider: false,
             emoji: true,
             tfo: false,
             scv: false,

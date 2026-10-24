@@ -301,7 +301,7 @@ loadButton.addEventListener("click", async () => {
     form.elements.converter.value = config.converter_url;
     form.elements.filename.value = config.filename || "";
     rulesPicker.setUrl(config.policy.rules.source_url);
-    for (const name of ["emoji", "tfo", "scv", "fdn", "expand", "sort", "new_name"]) {
+    for (const name of ["provider", "emoji", "tfo", "scv", "fdn", "expand", "sort", "new_name"]) {
       form.elements[name].checked = config.policy.converter[name];
     }
     setIntervalValue(config.policy.converter.interval_secs);
@@ -343,7 +343,7 @@ function readForm() {
       policy: {
         rules: { source_url: rulesPicker.getUrl() },
         converter: {
-          ...Object.fromEntries(["emoji", "tfo", "scv", "fdn", "expand", "sort", "new_name"].map(name => [name, data.has(name)])),
+          ...Object.fromEntries(["provider", "emoji", "tfo", "scv", "fdn", "expand", "sort", "new_name"].map(name => [name, data.has(name)])),
           interval_secs: Number(data.get("interval")),
         },
       },

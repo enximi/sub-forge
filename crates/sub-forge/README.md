@@ -69,7 +69,9 @@ curl --fail-with-body https://sub.example.com/api/v1/subscriptions \
 
 启用生成鉴权时添加 `Authorization: Bearer <管理 token>`。返回的订阅 URL 及后续回调仅包含随机 ID，访问时无需 token。
 
-`source_url`、`converter_url` 和 `policy.rules.source_url` 必填。`policy.converter` 可省略，选项为 `emoji=true`、`tfo=false`、`scv=false`、`fdn=false`、`expand=true`、`sort=false`、`new_name=true`、`interval_secs=86400`；刷新间隔范围 60–604800 秒。`scripts` 和其中各阶段可省略，默认空字符串。`filename` 可省略，默认 `sub-forge`，用于 `/clash` 和 `/subscription` 的 `Content-Disposition` 及转换器 `filename` 参数；只填写不含扩展名的单段名称，最多 64 个字符，不能包含路径分隔符、控制字符或 `: * ? " < > |`，配置下载为 `<filename>.yaml`，原始订阅为 `<filename>.txt`。中文名称会同时输出 ASCII 回退名和 RFC 5987 `filename*=UTF-8''...`。未知字段会被拒绝。
+`source_url`、`converter_url` 和 `policy.rules.source_url` 必填。`policy.converter` 可省略，选项为 `provider=false`、`emoji=true`、`tfo=false`、`scv=false`、`fdn=false`、`expand=true`、`sort=false`、`new_name=true`、`interval_secs=86400`；刷新间隔范围 60–604800 秒。`scripts` 和其中各阶段可省略，默认空字符串。`filename` 可省略，默认 `sub-forge`，用于 `/clash` 和 `/subscription` 的 `Content-Disposition` 及转换器 `filename` 参数；只填写不含扩展名的单段名称，最多 64 个字符，不能包含路径分隔符、控制字符或 `: * ? " < > |`，配置下载为 `<filename>.yaml`，原始订阅为 `<filename>.txt`。中文名称会同时输出 ASCII 回退名和 RFC 5987 `filename*=UTF-8''...`。未知字段会被拒绝。
+
+`provider` 控制节点 Provider 模式，省略时默认为关闭（包括已有记录）。关闭时向转换器传递 `url=node:<订阅回调地址>`，仍使用 `list=false` 生成完整配置和规则；需使用支持该前缀的 SubConverter-Extended。此时节点写入配置，更新节点需刷新整份订阅，provider 刷新间隔不再用于这些节点。该选项与控制规则集的 `expand` 独立。
 
 生成时校验 URL 格式、选项、脚本长度和 QuickJS 语法，不抓取上游或执行用户代码。脚本按原文保存，保留注释和排版。三个脚本合计最多 64 KiB，JSON 请求体最多 512 KiB，每个 URL 最多 2048 字节；超过请求体限制也返回 JSON 错误。生成成功不代表上游可用、`transform` 入口有效或实际转换成功。
 

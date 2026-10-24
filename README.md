@@ -99,6 +99,7 @@ SQLite 自动升级时保留已有 ID 和创建时间。旧版曾合并为同一
 | 编排字段 | 类型与用途 | 默认值 |
 | --- | --- | --- |
 | `rules.source_url` | 规则模板 URL，必填；核心不预设规则源 | 无 |
+| `converter.provider` | 使用 Provider 模式布尔值 | 关闭 |
 | `converter.emoji` | 节点名称添加 Emoji 布尔值 | 开启 |
 | `converter.tfo` | TCP Fast Open 布尔值 | 关闭 |
 | `converter.scv` | 跳过证书验证布尔值 | 关闭 |
@@ -107,6 +108,8 @@ SQLite 自动升级时保留已有 ID 和创建时间。旧版曾合并为同一
 | `converter.sort` | 按节点名称排序布尔值 | 关闭 |
 | `converter.new_name` | 使用新版 Clash 字段名布尔值 | 开启 |
 | `converter.interval_secs` | 刷新间隔整数 | 86400 秒，范围 60–604800 |
+
+Provider 模式默认关闭，旧订阅缺少该字段时也按关闭处理。关闭时使用 SubConverter-Extended 的 `node:` 订阅前缀，将节点写入完整配置，节点随整份订阅刷新；所选转换器须支持此语法。该开关控制节点 provider，与“展开规则集”独立。
 
 刷新间隔传递给转换器，并应用到本次订阅对应的 HTTP provider；用户后处理脚本仍可覆盖它。本站不会保存任务或定时刷新。
 
@@ -162,7 +165,7 @@ Linux 可执行文件在 Debian 11 环境构建，要求 glibc 2.31 或更新版
 
 ## 单容器部署
 
-程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 `linux/amd64`、`linux/arm64`。当前版本为 `0.5.0`。需要从源码构建时使用：
+程序和网页打包在同一个 `ghcr.io/enximi/sub-forge` 镜像中，支持 `linux/amd64`、`linux/arm64`。当前版本为 `0.6.0`。需要从源码构建时使用：
 
 ```bash
 docker compose -f compose.yml -f compose.dev.yml up -d --build --wait

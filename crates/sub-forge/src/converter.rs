@@ -70,7 +70,13 @@ impl Converter {
             let mut pairs = url.query_pairs_mut();
             pairs.extend_pairs(extra);
             pairs.append_pair("target", "clash");
-            pairs.append_pair("url", subscription_url.as_str());
+            // Extended 通过 node: 前缀强制解析订阅，仍保留完整配置和规则生成。
+            let source = if options.provider {
+                subscription_url.to_string()
+            } else {
+                format!("node:{subscription_url}")
+            };
+            pairs.append_pair("url", &source);
             pairs.append_pair("config", rules_url.as_str());
             pairs.append_pair("filename", filename);
             pairs.append_pair("list", "false");
