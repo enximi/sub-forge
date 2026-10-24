@@ -70,13 +70,7 @@ impl Converter {
             let mut pairs = url.query_pairs_mut();
             pairs.extend_pairs(extra);
             pairs.append_pair("target", "clash");
-            // Extended 通过 node: 前缀强制解析订阅，仍保留完整配置和规则生成。
-            let source = if options.provider {
-                subscription_url.to_string()
-            } else {
-                format!("node:{subscription_url}")
-            };
-            pairs.append_pair("url", &source);
+            pairs.append_pair("url", subscription_url.as_str());
             pairs.append_pair("config", rules_url.as_str());
             pairs.append_pair("filename", filename);
             pairs.append_pair("list", "false");
@@ -95,6 +89,28 @@ impl Converter {
             pairs.append_pair("interval", &options.interval_secs.to_string());
         }
         url
+    }
+
+    pub async fn nodes(&self, request: &ConversionRequest) -> Result<Vec<u8>, AppError> {
+        let mut url = self.request_url(
+            &request.converter_url,
+            &request.subscription_url,
+            &request.rules_url,
+            &request.options,
+            &request.filename,
+        );
+        // 节点列表不需要规则模板，避免重复运行规则预处理脚本。
+        let pairs: Vec<_> = url
+            .query_pairs()
+            .into_owned()
+            .filter(|(key, _)| key != "list" && key != "config")
+            .collect();
+        url.set_query(None);
+        url.query_pairs_mut()
+            .extend_pairs(pairs)
+            .append_pair("list", "true");
+        let response = self.network.get(url).await?;
+        read_limited_response(response, self.max_bytes).await
     }
 
     pub async fn generate(&self, request: &ConversionRequest) -> Result<Vec<u8>, AppError> {

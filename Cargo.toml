@@ -4,13 +4,14 @@ default-members = ["crates/sub-forge"]
 resolver = "3"
 
 [workspace.package]
-version = "0.6.0"
+version = "0.6.1"
 edition = "2024"
 rust-version = "1.97"
 license = "MIT"
 repository = "https://github.com/enximi/sub-forge"
 
 [workspace.dependencies]
+regex = "1"
 rusqlite = { version = "0.38", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
 ipnet = "2"

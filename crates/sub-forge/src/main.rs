@@ -8,6 +8,7 @@ mod links;
 mod model;
 mod network;
 mod pipeline;
+mod providers;
 mod rules;
 mod scripts;
 mod service;

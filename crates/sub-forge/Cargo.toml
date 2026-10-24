@@ -8,6 +8,7 @@ repository.workspace = true
 description = "SQLite-backed Mihomo subscription conversion with optional JavaScript processing"
 
 [dependencies]
+regex.workspace = true
 rusqlite.workspace = true
 uuid.workspace = true
 ipnet.workspace = true

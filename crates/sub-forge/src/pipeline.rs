@@ -3,6 +3,7 @@ use serde_json::Value;
 use crate::{
     converter::{ConversionRequest, Converter},
     error::AppError,
+    providers,
     scripts::ScriptEngine,
 };
 
@@ -62,6 +63,16 @@ impl ConfigPipeline {
                     provider["interval"] = request.options.interval_secs.into();
                 }
             }
+        }
+        if !request.options.provider
+            && providers::has_subscription_provider(&document, request.subscription_url.as_str())
+        {
+            let nodes = self.converter.nodes(request).await?;
+            providers::inline_subscription(
+                &mut document,
+                &nodes,
+                request.subscription_url.as_str(),
+            )?;
         }
         let document = if postprocess_script.trim().is_empty() {
             document
